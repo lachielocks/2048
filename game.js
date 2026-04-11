@@ -679,6 +679,10 @@ window.addEventListener('keydown', (e) => {
 
   if (isAutoplay) return; // AI has control
 
+  // Don't intercept keys when the user is typing in a form field
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
   let dir = null;
   switch (e.key) {
     case 'ArrowLeft':  case 'a': case 'A': dir = 'left';  break;
