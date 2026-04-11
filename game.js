@@ -272,7 +272,7 @@ function move(dir) {
       grid[r][c] = null;
       tile.row = tr; tile.col = tc;
       // Slow the slide for the epic 2048 merge (real games only)
-      if (mergeWith.value === 1024 && tile.value === 1024 && !won && !isAutoplay && !isUntrackedGame) {
+      if (mergeWith.value === 1024 && tile.value === 1024 && !won && !isAutoplay) {
         tile.el.classList.add('tile-slow-merge');
         mergeWith.el.classList.add('tile-slow-merge');
         will2048Merge = true;
@@ -342,7 +342,7 @@ function afterSlide() {
         // Win — epic animation path for real games, instant for AI/demo
         if (t.value === 2048 && !won) {
           won = true;
-          if (!isAutoplay && !isUntrackedGame) {
+          if (!isAutoplay) {
             // Hand off to win-animation.js; keep isAnimating = true to block input
             spawnTile();
             updatePowerUpUI();
