@@ -125,12 +125,13 @@
     const toast = document.createElement('div');
     toast.className = 'achievement-toast';
     toast.innerHTML = `
-      <div class="achievement-toast-icon">🏆</div>
+      <div class="achievement-toast-icon"><i data-lucide="award"></i></div>
       <div class="achievement-toast-body">
         <div class="achievement-toast-label">${achievement.label}</div>
         <div class="achievement-toast-desc">${achievement.description}</div>
       </div>
-      <button class="achievement-toast-close" aria-label="Dismiss">✕</button>`;
+      <button class="achievement-toast-close" aria-label="Dismiss"><i data-lucide="x"></i></button>`;
+    window.refreshIcons?.();
 
     container.appendChild(toast);
 

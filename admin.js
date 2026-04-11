@@ -134,12 +134,13 @@ async function loadUsers() {
       <td>${u.is_admin ? '<span class="badge badge--admin">Admin</span>' : '—'}</td>
       <td>
         <div class="actions-cell">
-          <button class="btn-admin" onclick="clearUserGames('${u.id}','${esc(u.display_name)}')">Clear Games</button>
-          <button class="btn-admin" onclick="openAchievementsModal('${u.id}','${esc(u.display_name)}')">Achievements</button>
-          ${!u.is_admin ? `<button class="btn-admin btn-admin--danger" onclick="deleteUser('${u.id}','${esc(u.display_name)}')">Delete</button>` : ''}
+          <button class="btn-admin" onclick="clearUserGames('${u.id}','${esc(u.display_name)}')"><i data-lucide="trash-2"></i> Clear Games</button>
+          <button class="btn-admin" onclick="openAchievementsModal('${u.id}','${esc(u.display_name)}')"><i data-lucide="award"></i> Achievements</button>
+          ${!u.is_admin ? `<button class="btn-admin btn-admin--danger" onclick="deleteUser('${u.id}','${esc(u.display_name)}')"><i data-lucide="user-x"></i> Delete</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
+  window.refreshIcons?.();
 }
 
 async function clearUserGames(userId, name) {
@@ -261,8 +262,9 @@ async function loadRecentGames() {
       <td>${fmtDuration(g.duration_seconds)}</td>
       <td><span class="badge ${g.won ? 'badge--win' : 'badge--loss'}">${g.won ? 'Won' : 'Lost'}</span></td>
       <td>${fmtDate(g.created_at)}</td>
-      <td><button class="btn-admin btn-admin--danger" onclick="deleteGame('${g.id}')">Delete</button></td>
+      <td><button class="btn-admin btn-admin--danger" onclick="deleteGame('${g.id}')"><i data-lucide="trash-2"></i> Delete</button></td>
     </tr>`).join('');
+  window.refreshIcons?.();
 }
 
 async function deleteGame(gameId) {

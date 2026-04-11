@@ -44,8 +44,9 @@
   function renderLoggedOut() {
     const slot = document.getElementById('auth-header-slot');
     if (!slot) return;
-    slot.innerHTML = `<button id="auth-sign-in-btn" class="btn btn-auth-pill" aria-label="Sign in">Sign in</button>`;
+    slot.innerHTML = `<button id="auth-sign-in-btn" class="btn btn-auth-pill" aria-label="Sign in"><i data-lucide="log-in"></i> Sign in</button>`;
     document.getElementById('auth-sign-in-btn').addEventListener('click', openAuthModal);
+    window.refreshIcons?.();
   }
 
   function renderLoggedIn(user) {
@@ -61,9 +62,9 @@
         <div class="avatar-circle" style="background:${colour}">${inits}</div>
         <span class="avatar-name">${truncated}</span>
         <div class="auth-dropdown" id="auth-dropdown" hidden>
-          <button class="auth-dropdown-item" id="stats-open-btn">My Stats</button>
-          ${isAdmin ? `<a class="auth-dropdown-item" href="/admin.html">Admin Panel</a>` : ''}
-          <button class="auth-dropdown-item auth-dropdown-item--danger" id="sign-out-btn">Sign out</button>
+          <button class="auth-dropdown-item" id="stats-open-btn"><i data-lucide="bar-chart-2"></i> My Stats</button>
+          ${isAdmin ? `<a class="auth-dropdown-item" href="/admin.html"><i data-lucide="shield"></i> Admin Panel</a>` : ''}
+          <button class="auth-dropdown-item auth-dropdown-item--danger" id="sign-out-btn"><i data-lucide="log-out"></i> Sign out</button>
         </div>
       </div>`;
 
@@ -92,6 +93,7 @@
     });
 
     document.addEventListener('click', () => { dropdown.hidden = true; }, { capture: false });
+    window.refreshIcons?.();
   }
 
   function showNotificationDot() {

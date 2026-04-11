@@ -29,7 +29,7 @@
       </div>
       <div class="admin-header-right">
         <span id="admin-user-name" class="admin-user"></span>
-        <a href="/" class="admin-back-link">← Back to game</a>
+        <a href="/" class="admin-back-link"><i data-lucide="arrow-left"></i> Back to game</a>
       </div>
     </header>
 
@@ -90,7 +90,7 @@
       <section class="admin-section">
         <div class="section-header">
           <h2 class="section-title">Users</h2>
-          <button class="btn-admin" onclick="loadUsers()">Refresh</button>
+          <button class="btn-admin" onclick="loadUsers()"><i data-lucide="refresh-cw"></i> Refresh</button>
         </div>
         <div class="table-wrap">
           <table class="admin-table" id="users-table">
@@ -116,7 +116,7 @@
       <section class="admin-section">
         <div class="section-header">
           <h2 class="section-title">Recent Games</h2>
-          <button class="btn-admin" onclick="loadRecentGames()">Refresh</button>
+          <button class="btn-admin" onclick="loadRecentGames()"><i data-lucide="refresh-cw"></i> Refresh</button>
         </div>
         <div class="table-wrap">
           <table class="admin-table" id="games-table">
@@ -167,8 +167,11 @@
 
   <div id="admin-toast-container"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+  <script>window.refreshIcons = () => typeof lucide !== 'undefined' && lucide.createIcons();</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
   <script src="admin.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', refreshIcons);</script>
 </body>
 </html>

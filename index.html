@@ -43,8 +43,8 @@
         </div>
         <div class="buttons">
           <div id="auth-header-slot"></div>
-          <button class="btn" id="ai-btn" aria-label="Watch AI play">Watch AI</button>
-          <button class="btn" id="new-game-btn" aria-label="New Game">New Game</button>
+          <button class="btn" id="ai-btn" aria-label="Watch AI play"><i data-lucide="bot"></i> Watch AI</button>
+          <button class="btn" id="new-game-btn" aria-label="New Game"><i data-lucide="rotate-ccw"></i> New Game</button>
         </div>
       </div>
     </header>
@@ -53,14 +53,14 @@
       <section class="powerups" aria-label="Power-ups">
         <!-- Undo -->
         <button class="powerup-btn" id="undo-btn" aria-label="Undo last move">
-          <span class="powerup-icon">↩</span>
+          <span class="powerup-icon"><i data-lucide="undo-2"></i></span>
           <span class="powerup-label">Undo</span>
           <span class="powerup-sub" id="undo-sub">Last move</span>
         </button>
 
         <!-- Swap -->
         <button class="powerup-btn locked" id="swap-btn" aria-label="Swap two tiles">
-          <span class="powerup-icon">⇄</span>
+          <span class="powerup-icon"><i data-lucide="arrow-left-right"></i></span>
           <span class="powerup-label">Swap</span>
           <div class="powerup-bar" id="swap-bar">
             <div class="powerup-bar-seg"><div class="powerup-bar-fill" id="swap-fill-0"></div></div>
@@ -72,7 +72,7 @@
 
         <!-- Delete -->
         <button class="powerup-btn locked" id="delete-btn" aria-label="Delete all tiles of a number">
-          <span class="powerup-icon">✕</span>
+          <span class="powerup-icon"><i data-lucide="eraser"></i></span>
           <span class="powerup-label">Delete</span>
           <div class="powerup-bar" id="delete-bar">
             <div class="powerup-bar-seg"><div class="powerup-bar-fill" id="delete-fill-0"></div></div>
@@ -113,7 +113,7 @@
     </div>
 
     <div class="below-board-actions">
-      <button class="btn" id="leaderboard-btn">Leaderboard</button>
+      <button class="btn" id="leaderboard-btn"><i data-lucide="trophy"></i> Leaderboard</button>
     </div>
 
     <section class="how-to-play" aria-label="How to play">
@@ -136,7 +136,7 @@
   <!-- ─── Auth Modal ─────────────────────────────────────────────── -->
   <div id="auth-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Sign in or sign up">
     <div class="modal-card">
-      <button class="modal-close-btn" id="auth-modal-close" aria-label="Close">✕</button>
+      <button class="modal-close-btn" id="auth-modal-close" aria-label="Close"><i data-lucide="x"></i></button>
       <h2 class="modal-title">Welcome</h2>
 
       <div class="modal-tabs">
@@ -195,10 +195,10 @@
   <!-- ─── Leaderboard Modal ──────────────────────────────────────── -->
   <div id="leaderboard-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Leaderboard">
     <div class="modal-card modal-card--wide">
-      <button class="modal-close-btn" id="lb-close-btn" aria-label="Close">✕</button>
+      <button class="modal-close-btn" id="lb-close-btn" aria-label="Close"><i data-lucide="x"></i></button>
       <div class="modal-header-row">
         <h2 class="modal-title">Leaderboard</h2>
-        <button class="btn btn-icon" id="lb-refresh-btn" aria-label="Refresh">↻</button>
+        <button class="btn btn-icon" id="lb-refresh-btn" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
       </div>
 
       <div class="modal-tabs">
@@ -226,7 +226,7 @@
   <!-- ─── Stats Modal ────────────────────────────────────────────── -->
   <div id="stats-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="My Stats">
     <div class="modal-card modal-card--wide">
-      <button class="modal-close-btn" id="stats-close-btn" aria-label="Close">✕</button>
+      <button class="modal-close-btn" id="stats-close-btn" aria-label="Close"><i data-lucide="x"></i></button>
       <h2 class="modal-title">My Stats</h2>
       <div id="stats-content" class="stats-content">
         <div class="stats-loading">Loading…</div>
@@ -266,7 +266,9 @@
       });
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>window.refreshIcons = () => typeof lucide !== 'undefined' && lucide.createIcons();</script>
   <script src="supabase.js"></script>
   <script src="auth.js"></script>
   <script src="achievements.js"></script>
@@ -275,5 +277,6 @@
   <script src="confetti.js"></script>
   <script src="solver.js"></script>
   <script src="game.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', refreshIcons);</script>
 </body>
 </html>

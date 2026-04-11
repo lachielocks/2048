@@ -298,9 +298,11 @@ function move(dir) {
     scoreEl.textContent = score;
   }
 
-  document.dispatchEvent(new CustomEvent('game:move', {
-    detail: { score, highestTile: getHighestTile(), moveCount }
-  }));
+  if (!isAutoplay && !isUntrackedGame) {
+    document.dispatchEvent(new CustomEvent('game:move', {
+      detail: { score, highestTile: getHighestTile(), moveCount }
+    }));
+  }
 
   isAnimating = true;
   setTimeout(afterSlide, SLIDE_MS + 20);

@@ -1,6 +1,7 @@
 /* admin.css */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
+.lucide { display:inline-block; width:1em; height:1em; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; fill:none; vertical-align:-0.15em; flex-shrink:0; }
 
 :root {
   --orange:     #FF6B2B;

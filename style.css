@@ -5,6 +5,20 @@
   padding: 0;
 }
 
+/* ─── Lucide icons ──────────────────────────────────────────────── */
+.lucide {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
+
 :root {
   --orange:        #FF6B2B;
   --orange-hot:    #ff3d00;
@@ -620,10 +634,17 @@ body {
 
 /* Icon */
 .powerup-icon {
-  font-size: 20px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: rgba(255,255,255,0.75);
   transition: color 160ms ease;
+}
+
+.powerup-icon .lucide {
+  width: 20px;
+  height: 20px;
+  vertical-align: 0;
 }
 
 .powerup-btn.active .powerup-icon {
