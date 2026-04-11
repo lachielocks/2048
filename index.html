@@ -166,9 +166,10 @@
           <input class="modal-input" id="signup-password" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
         </div>
         <p class="modal-error auth-error" id="signup-error" hidden></p>
-        <p class="modal-info" id="signup-confirm-msg" hidden>Check your email to confirm your account, then sign in.</p>
         <button class="btn modal-submit-btn" type="submit" data-label="Create account">Create account</button>
       </form>
+      <!-- Shown after successful sign-up (outside form so form.hidden doesn't bury it) -->
+      <p class="modal-info modal-info--confirm" id="signup-confirm-msg" hidden>Almost there! Check your email (including junk/spam) for a confirmation link, then come back and sign in.</p>
     </div>
   </div>
 

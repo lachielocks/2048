@@ -1171,6 +1171,16 @@ body {
 
 .modal-info[hidden] { display: none; }
 
+.modal-info--confirm {
+  background: rgba(255,107,43,0.08);
+  border: 1px solid rgba(255,107,43,0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
 .modal-submit-btn {
   width: 100%;
   padding: 11px;
