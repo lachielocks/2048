@@ -2,7 +2,7 @@
 'use strict';
 
 const SUPABASE_URL = 'https://sxjvxfgylbeikmkwkogm.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_uvsCih7WYiIWp1rmWvqqRw_b2cFqzLN';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4anZ4Zmd5bGJlaWtta3drb2dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDI1NDcsImV4cCI6MjA5MTQ3ODU0N30.-MLJCQobg8w1yKyKoCoyw8OrIUpm842roj5SsadpDl8';
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
