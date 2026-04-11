@@ -36,6 +36,9 @@ let autoplayTimer = null;
 // Set true for AI or demo games — skips best-score update + game:end event
 let isUntrackedGame = false;
 
+// Positions of tiles spawned after the last move (saved with game state)
+let recentSpawns = [];
+
 // Game tracking (for saving + achievements)
 let moveCount = 0;
 let gameStartTime = null;
@@ -185,6 +188,7 @@ function newGame() {
   undoUsed = false;
   powerupUsed = false;
   isUntrackedGame = false;
+  recentSpawns = [];
 
   scoreEl.textContent = '0';
   hideOverlays();
@@ -212,7 +216,7 @@ function newGame() {
 }
 
 // ─── Spawn ───────────────────────────────────────────────────────
-function spawnTile() {
+function spawnTile(trackRecent = false) {
   const empty = [];
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
@@ -224,6 +228,7 @@ function spawnTile() {
   const value = Math.random() < SPAWN_2_PROB ? 2 : 4;
   const tile = new Tile(r, c, value, true);
   grid[r][c] = tile;
+  if (trackRecent) recentSpawns.push([r, c]);
   return tile;
 }
 
@@ -361,7 +366,8 @@ function afterSlide() {
     }
   }
 
-  spawnTile();
+  recentSpawns = [];
+  spawnTile(true);
 
   if (!hasValidMoves()) {
     isGameOver = true;
@@ -865,6 +871,7 @@ window.getGameState = function () {
   return {
     board, score, moveCount, won, keepGoing,
     swapUses, deleteUses, undoUsed, powerupUsed,
+    recentSpawns,
     durationSoFar: gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0,
   };
 };
@@ -872,10 +879,11 @@ window.getGameState = function () {
 window.applyGameState = function (state) {
   suppressReset = true;
   newGame();
-  // Restore grid
+  // Restore grid — mark recently spawned tiles as new so they animate in
+  const spawned = new Set((state.recent_spawns || state.recentSpawns || []).map(([r, c]) => `${r},${c}`));
   for (let r = 0; r < SIZE; r++)
     for (let c = 0; c < SIZE; c++)
-      if (state.board[r][c]) grid[r][c] = new Tile(r, c, state.board[r][c], false);
+      if (state.board[r][c]) grid[r][c] = new Tile(r, c, state.board[r][c], spawned.has(`${r},${c}`));
   // Restore state
   score        = state.score        || 0;
   moveCount    = state.move_count   || state.moveCount || 0;

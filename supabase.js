@@ -125,6 +125,7 @@ async function saveGameState(userId, state) {
     undo_used:    state.undoUsed,
     powerup_used: state.powerupUsed,
     duration_so_far: state.durationSoFar,
+    recent_spawns:   state.recentSpawns || [],
     updated_at:   new Date().toISOString(),
   }, { onConflict: 'user_id' });
 }
