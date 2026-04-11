@@ -4,7 +4,14 @@
 const SUPABASE_URL = 'https://sxjvxfgylbeikmkwkogm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4anZ4Zmd5bGJlaWtta3drb2dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDI1NDcsImV4cCI6MjA5MTQ3ODU0N30.-MLJCQobg8w1yKyKoCoyw8OrIUpm842roj5SsadpDl8';
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    // Bypass navigator.locks — the default locking strategy can deadlock across
+    // page navigations (index → admin → index) when a lock isn't fully released
+    // before the next createClient call acquires it.
+    lock: (name, acquireTimeout, fn) => fn(),
+  },
+});
 
 // ─── Game saving ──────────────────────────────────────────────────
 async function saveGame(userId, gameData) {
