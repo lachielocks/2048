@@ -76,10 +76,12 @@ body {
 .logo {
   font-family: var(--font-title);
   font-weight: 800;
-  font-size: clamp(52px, 14vw, 80px);
-  line-height: 1;
+  font-size: clamp(36px, 10vw, 56px);
+  line-height: 0.88;
   color: var(--orange);
-  letter-spacing: -2px;
+  letter-spacing: -1.5px;
+  display: flex;
+  flex-direction: column;
   animation: logo-glow 3s ease-in-out infinite;
   text-shadow:
     0 0 20px rgba(255,107,43,0.6),
@@ -446,9 +448,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: var(--radius-board);
-  background: rgba(15, 15, 15, 0.88);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(10, 10, 10, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
