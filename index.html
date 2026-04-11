@@ -31,19 +31,21 @@
         <p class="subtitle">Join the numbers and get to the <strong>2048 tile!</strong></p>
       </div>
       <div class="header-right">
-        <div class="scores">
-          <div class="score-box" id="score-box">
-            <span class="score-label">SCORE</span>
-            <span class="score-value" id="score">0</span>
-          </div>
-          <div class="score-box" id="best-box">
-            <span class="score-label">BEST</span>
-            <span class="score-value" id="best">0</span>
+        <div class="scores-row">
+          <div id="cloud-save-indicator" class="cloud-save-indicator" hidden></div>
+          <div class="scores">
+            <div class="score-box" id="score-box">
+              <span class="score-label">SCORE</span>
+              <span class="score-value" id="score">0</span>
+            </div>
+            <div class="score-box" id="best-box">
+              <span class="score-label">BEST</span>
+              <span class="score-value" id="best">0</span>
+            </div>
           </div>
         </div>
         <div class="buttons">
           <div id="auth-header-slot"></div>
-          <div id="cloud-save-indicator" class="cloud-save-indicator" hidden></div>
           <button class="btn" id="ai-btn" aria-label="Watch AI play"><i data-lucide="bot"></i> Watch AI</button>
           <button class="btn" id="new-game-btn" aria-label="New Game"><i data-lucide="rotate-ccw"></i> New Game</button>
         </div>

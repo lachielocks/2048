@@ -152,6 +152,12 @@ body {
 }
 
 /* ─── Score boxes ──────────────────────────────────────────────── */
+.scores-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .scores {
   display: flex;
   gap: 8px;
@@ -858,6 +864,10 @@ body {
     width: 100%;
   }
 
+  .scores-row {
+    width: 100%;
+  }
+
   .scores {
     width: 100%;
   }
@@ -893,7 +903,7 @@ body {
   height: 32px;
   border-radius: 50%;
   cursor: default;
-  transition: color 200ms ease, opacity 200ms ease;
+  transition: color 200ms ease, opacity 200ms ease, background 150ms ease;
   position: relative;
 }
 
@@ -909,9 +919,31 @@ body {
   50%       { opacity: 1; }
 }
 
-/* Tooltip via title — browsers handle this natively, but add a subtle hover ring */
-.cloud-save-indicator:hover {
-  background: rgba(255,255,255,0.06);
+.cloud-save-indicator:hover { background: rgba(255,255,255,0.06); }
+
+/* Tooltip */
+.cloud-save-indicator[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.88);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 200;
+}
+.cloud-save-indicator[data-tooltip]:hover::after {
+  opacity: 1;
 }
 
 .btn-auth-pill {

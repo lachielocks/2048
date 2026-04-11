@@ -27,7 +27,7 @@
     wrap.dataset.state = state;
     const { icon, tip } = ICON_MAP[state] || ICON_MAP.offline;
     wrap.innerHTML = `<i data-lucide="${icon}"></i>`;
-    wrap.title = tip;
+    wrap.dataset.tooltip = tip;
     window.refreshIcons?.();
   }
 
