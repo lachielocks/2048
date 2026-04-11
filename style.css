@@ -617,24 +617,6 @@ body {
   box-shadow: 0 0 20px rgba(255,107,43,0.25), inset 0 0 12px rgba(255,107,43,0.06);
 }
 
-/* Badge — use counter */
-.powerup-badge {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  font-family: var(--font-title);
-  font-weight: 700;
-  font-size: 11px;
-  line-height: 1;
-  background: var(--orange);
-  color: #fff;
-  border-radius: 100px;
-  padding: 3px 6px;
-  min-width: 20px;
-  text-align: center;
-}
-
-.powerup-badge[hidden] { display: none; }
 
 /* Icon */
 .powerup-icon {

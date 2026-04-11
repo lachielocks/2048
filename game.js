@@ -56,8 +56,6 @@ const aiBtnEl = document.getElementById('ai-btn');
 const undoBtnEl    = document.getElementById('undo-btn');
 const swapBtnEl    = document.getElementById('swap-btn');
 const deleteBtnEl  = document.getElementById('delete-btn');
-const swapBadgeEl  = document.getElementById('swap-badge');
-const deleteBadgeEl= document.getElementById('delete-badge');
 const undoSubEl    = document.getElementById('undo-sub');
 const swapSubEl    = document.getElementById('swap-sub');
 const deleteSubEl  = document.getElementById('delete-sub');
@@ -536,13 +534,10 @@ function updatePowerUpUI() {
   // Swap
   if (swapUses > 0) {
     swapBtnEl.classList.remove('locked');
-    swapBadgeEl.hidden = false;
-    swapBadgeEl.textContent = '×' + swapUses;
     if (activeMode !== 'swap') swapSubEl.textContent = '';
   } else {
     swapBtnEl.classList.add('locked');
     swapBtnEl.classList.remove('active');
-    swapBadgeEl.hidden = true;
     if (activeMode !== 'swap') swapSubEl.textContent = 'Reach 256';
   }
   updateBarFills(swapFills, swapUses);
@@ -550,13 +545,10 @@ function updatePowerUpUI() {
   // Delete
   if (deleteUses > 0) {
     deleteBtnEl.classList.remove('locked');
-    deleteBadgeEl.hidden = false;
-    deleteBadgeEl.textContent = '×' + deleteUses;
     if (activeMode !== 'delete') deleteSubEl.textContent = '';
   } else {
     deleteBtnEl.classList.add('locked');
     deleteBtnEl.classList.remove('active');
-    deleteBadgeEl.hidden = true;
     if (activeMode !== 'delete') deleteSubEl.textContent = 'Reach 512';
   }
   updateBarFills(deleteFills, deleteUses);
