@@ -33,63 +33,66 @@
           </div>
         </div>
         <div class="buttons">
+          <button class="btn" id="ai-btn" aria-label="Watch AI play">Watch AI</button>
           <button class="btn" id="new-game-btn" aria-label="New Game">New Game</button>
         </div>
       </div>
     </header>
 
-    <main class="game-container">
-      <div class="board" id="board" role="grid" aria-label="2048 game board">
-        <div class="board-cells" id="board-cells" aria-hidden="true"></div>
-        <div class="tiles-container" id="tiles-container"></div>
-      </div>
+    <div class="game-area">
+      <section class="powerups" aria-label="Power-ups">
+        <!-- Undo -->
+        <button class="powerup-btn" id="undo-btn" aria-label="Undo last move">
+          <span class="powerup-icon">↩</span>
+          <span class="powerup-label">Undo</span>
+          <span class="powerup-sub" id="undo-sub">Last move</span>
+        </button>
 
-      <div class="overlay" id="win-overlay" role="dialog" aria-modal="true" aria-label="You win!" hidden>
-        <div class="overlay-content">
-          <p class="overlay-title win-title">You win! 🎉</p>
-          <p class="overlay-score-text">Score: <span id="win-score">0</span></p>
-          <div class="overlay-buttons">
-            <button class="btn btn-overlay" id="keep-going-btn">Keep Going</button>
-            <button class="btn btn-overlay btn-secondary" id="win-new-game-btn">New Game</button>
+        <!-- Swap -->
+        <button class="powerup-btn locked" id="swap-btn" aria-label="Swap two tiles">
+          <span class="powerup-badge" id="swap-badge" hidden></span>
+          <span class="powerup-icon">⇄</span>
+          <span class="powerup-label">Swap</span>
+          <span class="powerup-sub" id="swap-sub">Make a 256</span>
+        </button>
+
+        <!-- Delete -->
+        <button class="powerup-btn locked" id="delete-btn" aria-label="Delete all tiles of a number">
+          <span class="powerup-badge" id="delete-badge" hidden></span>
+          <span class="powerup-icon">✕</span>
+          <span class="powerup-label">Delete</span>
+          <span class="powerup-sub" id="delete-sub">Make a 512</span>
+        </button>
+      </section>
+
+      <main class="game-container">
+        <div class="board" id="board" role="grid" aria-label="2048 game board">
+          <div class="board-cells" id="board-cells" aria-hidden="true"></div>
+          <div class="tiles-container" id="tiles-container"></div>
+        </div>
+
+        <div class="overlay" id="win-overlay" role="dialog" aria-modal="true" aria-label="You win!" hidden>
+          <div class="overlay-content">
+            <p class="overlay-title win-title">You win! 🎉</p>
+            <p class="overlay-score-text">Score: <span id="win-score">0</span></p>
+            <div class="overlay-buttons">
+              <button class="btn btn-overlay" id="keep-going-btn">Keep Going</button>
+              <button class="btn btn-overlay btn-secondary" id="win-new-game-btn">New Game</button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="overlay" id="gameover-overlay" role="dialog" aria-modal="true" aria-label="Game over" hidden>
-        <div class="overlay-content">
-          <p class="overlay-title">Game over</p>
-          <p class="overlay-score-text">Score: <span id="gameover-score">0</span></p>
-          <div class="overlay-buttons">
-            <button class="btn btn-overlay" id="try-again-btn">Try Again</button>
+        <div class="overlay" id="gameover-overlay" role="dialog" aria-modal="true" aria-label="Game over" hidden>
+          <div class="overlay-content">
+            <p class="overlay-title">Game over</p>
+            <p class="overlay-score-text">Score: <span id="gameover-score">0</span></p>
+            <div class="overlay-buttons">
+              <button class="btn btn-overlay" id="try-again-btn">Try Again</button>
+            </div>
           </div>
         </div>
-      </div>
-    </main>
-
-    <section class="powerups" aria-label="Power-ups">
-      <!-- Undo -->
-      <button class="powerup-btn" id="undo-btn" aria-label="Undo last move">
-        <span class="powerup-icon">↩</span>
-        <span class="powerup-label">Undo</span>
-        <span class="powerup-sub" id="undo-sub">Last move</span>
-      </button>
-
-      <!-- Swap -->
-      <button class="powerup-btn locked" id="swap-btn" aria-label="Swap two tiles">
-        <span class="powerup-badge" id="swap-badge" hidden></span>
-        <span class="powerup-icon">⇄</span>
-        <span class="powerup-label">Swap</span>
-        <span class="powerup-sub" id="swap-sub">Make a 256</span>
-      </button>
-
-      <!-- Delete -->
-      <button class="powerup-btn locked" id="delete-btn" aria-label="Delete all tiles of a number">
-        <span class="powerup-badge" id="delete-badge" hidden></span>
-        <span class="powerup-icon">✕</span>
-        <span class="powerup-label">Delete</span>
-        <span class="powerup-sub" id="delete-sub">Make a 512</span>
-      </button>
-    </section>
+      </main>
+    </div>
 
     <section class="how-to-play" aria-label="How to play">
       <strong>HOW TO PLAY:</strong> Use your <strong>arrow keys</strong> or <strong>WASD</strong> to move the tiles.
@@ -109,6 +112,7 @@
   </div>
 
   <script src="confetti.js"></script>
+  <script src="solver.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

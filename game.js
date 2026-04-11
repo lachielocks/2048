@@ -29,6 +29,10 @@ const MAX_USES = 3;
 let activeMode = null; // 'swap' | 'delete' | null
 let swapFirstTile = null;
 
+// AI autoplay
+let isAutoplay = false;
+let autoplayTimer = null;
+
 // ─── DOM refs ────────────────────────────────────────────────────
 const tilesContainer  = document.getElementById('tiles-container');
 const boardCells      = document.getElementById('board-cells');
@@ -44,6 +48,9 @@ const tryAgainBtn     = document.getElementById('try-again-btn');
 const winScoreEl      = document.getElementById('win-score');
 const gameoverScoreEl = document.getElementById('gameover-score');
 const logoEl          = document.querySelector('.logo');
+
+// AI button DOM ref
+const aiBtnEl = document.getElementById('ai-btn');
 
 // Power-up DOM refs
 const undoBtnEl    = document.getElementById('undo-btn');
@@ -144,6 +151,7 @@ function buildCells() {
 
 // ─── New game ────────────────────────────────────────────────────
 function newGame() {
+  stopAutoplay();
   setActiveMode(null);
   tilesContainer.innerHTML = '';
   grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
@@ -622,6 +630,8 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (isAutoplay) return; // AI has control
+
   let dir = null;
   switch (e.key) {
     case 'ArrowLeft':  case 'a': case 'A': dir = 'left';  break;
@@ -640,8 +650,8 @@ let pStartX = 0, pStartY = 0, pStarted = false;
 const MIN_SWIPE = 30;
 
 boardEl.addEventListener('pointerdown', (e) => {
-  // Don't initiate swipe if a power-up mode is active (tile clicks handle those)
-  if (activeMode) return;
+  // Don't initiate swipe if a power-up mode is active or AI is running
+  if (activeMode || isAutoplay) return;
   pStartX = e.clientX;
   pStartY = e.clientY;
   pStarted = true;
@@ -662,6 +672,7 @@ boardEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fals
 
 // ─── Buttons ─────────────────────────────────────────────────────
 newGameBtn.addEventListener('click', newGame);
+aiBtnEl.addEventListener('click', toggleAutoplay);
 
 undoBtnEl.addEventListener('click', undoMove);
 
@@ -683,6 +694,50 @@ keepGoingBtn.addEventListener('click', () => {
 });
 winNewGameBtn.addEventListener('click', newGame);
 tryAgainBtn.addEventListener('click', newGame);
+
+// ─── AI Autoplay ─────────────────────────────────────────────────
+function toggleAutoplay() {
+  if (isAutoplay) {
+    stopAutoplay();
+  } else {
+    startAutoplay();
+  }
+}
+
+function startAutoplay() {
+  if (isGameOver) return;
+  if (won && !keepGoing) return;
+  isAutoplay = true;
+  aiBtnEl.textContent = 'Stop AI';
+  aiBtnEl.classList.add('active');
+  setActiveMode(null);
+  scheduleAiMove();
+}
+
+function stopAutoplay() {
+  isAutoplay = false;
+  clearTimeout(autoplayTimer);
+  autoplayTimer = null;
+  aiBtnEl.textContent = 'Watch AI';
+  aiBtnEl.classList.remove('active');
+}
+
+function scheduleAiMove() {
+  if (!isAutoplay) return;
+  autoplayTimer = setTimeout(doAiMove, 320);
+}
+
+function doAiMove() {
+  if (!isAutoplay) return;
+  if (isGameOver || (won && !keepGoing)) { stopAutoplay(); return; }
+  if (isAnimating) { scheduleAiMove(); return; }
+
+  const board = serializeGrid();
+  const dir = window.getBestMove(board);
+  if (!dir) { stopAutoplay(); return; }
+  move(dir);
+  scheduleAiMove();
+}
 
 // ─── Footer cross-promo ──────────────────────────────────────────
 function setupFooterCrossPromo() {
