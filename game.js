@@ -244,6 +244,7 @@ function move(dir) {
   const traversal = getTraversal(dir);
   let moved = false;
   let scoreGain = 0;
+  let will2048Merge = false;
 
   for (const [r, c] of traversal) {
     const tile = grid[r][c];
@@ -270,6 +271,12 @@ function move(dir) {
     if (mergeWith) {
       grid[r][c] = null;
       tile.row = tr; tile.col = tc;
+      // Slow the slide for the epic 2048 merge (real games only)
+      if (mergeWith.value === 1024 && tile.value === 1024 && !won && !isAutoplay && !isUntrackedGame) {
+        tile.el.classList.add('tile-slow-merge');
+        mergeWith.el.classList.add('tile-slow-merge');
+        will2048Merge = true;
+      }
       tile.position();
       mergeWith.merging = true;
       mergeWith.absorbedTile = tile;
@@ -305,7 +312,7 @@ function move(dir) {
   }
 
   isAnimating = true;
-  setTimeout(afterSlide, SLIDE_MS + 20);
+  setTimeout(afterSlide, (will2048Merge ? 620 : SLIDE_MS) + 20);
 }
 
 function afterSlide() {
@@ -323,18 +330,25 @@ function afterSlide() {
         if (t.value >= 256) swapUses   = Math.min(MAX_USES, swapUses + 1);
         if (t.value >= 512) deleteUses = Math.min(MAX_USES, deleteUses + 1);
 
-        // Confetti
-        if (t.value >= 512) {
+        // Confetti (skip for 2048 — win animation handles it)
+        if (t.value >= 512 && t.value !== 2048) {
           const rect = t.el.getBoundingClientRect();
-          const count = t.value >= 2048 ? 150 : t.value >= 1024 ? 80 : 40;
+          const count = t.value >= 1024 ? 80 : 40;
           if (typeof window.triggerConfetti === 'function') {
             window.triggerConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2, count);
           }
         }
 
-        // Win
+        // Win — epic animation path for real games, instant for AI/demo
         if (t.value === 2048 && !won) {
           won = true;
+          if (!isAutoplay && !isUntrackedGame) {
+            // Hand off to win-animation.js; keep isAnimating = true to block input
+            spawnTile();
+            updatePowerUpUI();
+            document.dispatchEvent(new CustomEvent('game:merge2048', { detail: { tileEl: t.el } }));
+            return; // afterSlide returns early; win-animation calls finishWin2048 when done
+          }
           showWinOverlay();
           pulseLogoOnWin();
         }
@@ -656,6 +670,12 @@ function showWinOverlay() {
   winScoreEl.textContent = score.toLocaleString();
   winOverlay.hidden = false;
 }
+
+// Called by win-animation.js when the epic sequence finishes
+window.finishWin2048 = function () {
+  isAnimating = false;
+  if (won) { showWinOverlay(); pulseLogoOnWin(); }
+};
 
 function showGameOverOverlay() {
   dispatchGameEnd(false);

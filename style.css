@@ -1702,3 +1702,123 @@ a.auth-dropdown-item {
 }
 
 .achievement-toast-close:hover { color: rgba(255,255,255,0.6); }
+
+/* ─── Win 2048 Epic Animation ──────────────────────────────────── */
+
+/* Slow the slide when two 1024s are merging */
+.tile-slow-merge {
+  transition-duration: 600ms !important;
+}
+
+/* Phase 1: Charge up glow on the about-to-merge tile */
+@keyframes tile-charge {
+  0%   { transform: scale(1);    filter: brightness(1)   drop-shadow(0 0 0   transparent); }
+  50%  { transform: scale(1.1);  filter: brightness(1.9) drop-shadow(0 0 28px rgba(255,210,60,0.85)); }
+  100% { transform: scale(1.2);  filter: brightness(2.8) drop-shadow(0 0 64px rgba(255,235,90,1)); }
+}
+.tile-charging {
+  animation: tile-charge 650ms ease-in forwards !important;
+  position: relative;
+  z-index: 5;
+}
+
+/* Phase 3: Slam overlay */
+#win-slam-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 8, 0.97);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+}
+#win-slam-overlay.win-slam-overlay--visible {
+  pointer-events: auto;
+  animation: slam-bg-in 80ms ease forwards;
+}
+@keyframes slam-bg-in {
+  to { opacity: 1; }
+}
+
+.win-slam-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.win-slam-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width:  min(52vw, 52vh, 310px);
+  height: min(52vw, 52vh, 310px);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f9d04e 0%, #FF6B2B 100%);
+  color: #fff;
+  font-family: var(--font-title);
+  font-size: min(15vw, 15vh, 96px);
+  font-weight: 800;
+  box-shadow:
+    0 0 60px  rgba(255, 180, 40, 0.7),
+    0 0 140px rgba(255, 107, 43, 0.4);
+  transform: scale(8);
+  opacity: 0;
+}
+#win-slam-overlay.win-slam-overlay--visible .win-slam-tile {
+  animation: slam-tile-in 480ms cubic-bezier(0.25, 2.4, 0.4, 0.92) 70ms forwards;
+}
+@keyframes slam-tile-in {
+  0%  { transform: scale(8);    opacity: 0; }
+  45% { opacity: 1; }
+  80% { transform: scale(0.96); }
+  100%{ transform: scale(1);    opacity: 1; }
+}
+
+.win-slam-sub {
+  font-family: var(--font-title);
+  font-size: clamp(18px, 4.5vw, 34px);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+  opacity: 0;
+  transform: translateY(14px);
+}
+#win-slam-overlay.win-slam-overlay--visible .win-slam-sub {
+  animation: slam-sub-in 380ms ease 420ms forwards;
+}
+@keyframes slam-sub-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Phase 6: Flying tile */
+.win-flyer {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f9d04e 0%, #FF6B2B 100%);
+  color: #fff;
+  font-family: var(--font-title);
+  font-weight: 800;
+  box-shadow: 0 0 40px rgba(255,160,40,0.55);
+  z-index: 9600;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Screen shake on slam */
+@keyframes slam-shake {
+  0%,100% { transform: translate(0,0); }
+  12%  { transform: translate(-5px, -4px); }
+  24%  { transform: translate( 5px,  3px); }
+  36%  { transform: translate(-4px,  4px); }
+  48%  { transform: translate( 3px, -3px); }
+  60%  { transform: translate(-2px,  2px); }
+  78%  { transform: translate( 2px, -1px); }
+}
+.slam-shake {
+  animation: slam-shake 420ms ease;
+}

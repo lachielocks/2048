@@ -1,7 +1,7 @@
 /* sw.js — Service worker for offline caching */
 'use strict';
 
-const CACHE_NAME = '2048-v2';
+const CACHE_NAME = '2048-v3';
 
 const STATIC_ASSETS = [
   '/',
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/admin.html',
   '/admin.css',
+  '/win-animation.js',
   '/admin.js',
 ];
 
