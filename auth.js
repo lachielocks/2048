@@ -2,7 +2,14 @@
 'use strict';
 
 (function () {
-  const supabase = window.db.client;
+  const supabase = window.db?.client;
+  if (!supabase) {
+    // Supabase client failed to init — still render a sign-in button so the user isn't stuck
+    const slot = document.getElementById('auth-header-slot');
+    if (slot) slot.innerHTML = `<button class="btn btn-auth-pill" disabled title="Auth unavailable">Sign in</button>`;
+    console.error('[auth] window.db.client is not available — aborting auth init');
+    return;
+  }
 
   // ─── State ─────────────────────────────────────────────────────
   let currentUser = null;
@@ -310,12 +317,28 @@
   let isAdmin = false;
 
   async function checkAdmin(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', userId)
-      .single();
-    isAdmin = data?.is_admin || false;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single();
+      if (error) { console.error('[auth] checkAdmin failed:', error); isAdmin = false; return; }
+      isAdmin = data?.is_admin || false;
+    } catch (err) {
+      console.error('[auth] checkAdmin threw:', err);
+      isAdmin = false;
+    }
+  }
+
+  // ─── Initial render: show sign-in button immediately ──────────
+  // This guarantees the header slot is populated even if onAuthStateChange is
+  // slow, throws, or never fires. If a real session exists, it'll be replaced
+  // by renderLoggedIn() when INITIAL_SESSION arrives.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderLoggedOut);
+  } else {
+    renderLoggedOut();
   }
 
   // ─── Auth state change ─────────────────────────────────────────
