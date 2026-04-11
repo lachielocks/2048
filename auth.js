@@ -157,7 +157,9 @@
     if (!password) { showAuthError('signin-error', 'Please enter your password.'); return; }
 
     setAuthLoading(form, true);
+    suppressSignInToast = true;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) suppressSignInToast = false;
     setAuthLoading(form, false);
 
     if (error) {
@@ -217,6 +219,7 @@
 
     const form = e.target;
     setAuthLoading(form, true);
+    suppressSignInToast = true;
     const { error } = await supabase.auth.verifyOtp({
       email: pendingVerifyEmail,
       token,
@@ -225,6 +228,7 @@
     setAuthLoading(form, false);
 
     if (error) {
+      suppressSignInToast = false;
       showAuthError('otp-error', error.message);
     } else {
       pendingVerifyEmail = null;
@@ -252,27 +256,121 @@
     await supabase.auth.signOut();
   }
 
+  // ─── Reset password modal ──────────────────────────────────────
+  function openResetModal() {
+    const modal = document.getElementById('reset-password-modal');
+    if (modal) modal.hidden = false;
+    document.getElementById('reset-new-password')?.focus();
+  }
+
+  function closeResetModal() {
+    const modal = document.getElementById('reset-password-modal');
+    if (modal) modal.hidden = true;
+    const form = document.getElementById('reset-password-form');
+    if (form) form.reset();
+    document.querySelectorAll('#reset-error').forEach(el => { el.textContent = ''; el.hidden = true; });
+  }
+
+  async function handleSetNewPassword(e) {
+    e.preventDefault();
+    const form = e.target;
+    const pw = document.getElementById('reset-new-password').value;
+    const pw2 = document.getElementById('reset-confirm-password').value;
+
+    if (pw.length < 6) { showAuthError('reset-error', 'Password must be at least 6 characters.'); return; }
+    if (pw !== pw2)    { showAuthError('reset-error', 'Passwords don\'t match.'); return; }
+
+    setAuthLoading(form, true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setAuthLoading(form, false);
+
+    if (error) {
+      showAuthError('reset-error', error.message);
+    }
+    // success handled by USER_UPDATED event
+  }
+
+  // ─── Auth info toast ───────────────────────────────────────────
+  function showAuthToast(msg, type = 'success') {
+    const container = document.getElementById('auth-toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `auth-toast auth-toast--${type}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('auth-toast--visible'));
+    setTimeout(() => {
+      toast.classList.remove('auth-toast--visible');
+      toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, 3500);
+  }
+
   // ─── Auth state change ─────────────────────────────────────────
+  // Track whether a sign-in was triggered by our own forms (suppress toast for those)
+  let suppressSignInToast = false;
+
   supabase.auth.onAuthStateChange(async (event, session) => {
     currentUser = session?.user || null;
 
-    if (currentUser) {
+    if (event === 'PASSWORD_RECOVERY') {
+      // User clicked a password reset link — show the set-new-password form
       renderLoggedIn(currentUser);
+      openResetModal();
+      cleanUrl();
+      return;
+    }
 
-      // Sync local games once per session
+    if (event === 'SIGNED_IN') {
+      renderLoggedIn(currentUser);
+      if (!suppressSignInToast) {
+        // Came from an email link or magic link redirect
+        showAuthToast('You\'re signed in — welcome back!');
+        cleanUrl();
+      }
+      suppressSignInToast = false;
+
       if (!localGamesSynced) {
         localGamesSynced = true;
         await window.db.syncLocalGames(currentUser.id);
-        // Sync local achievements
         if (typeof window.syncLocalAchievements === 'function') {
           await window.syncLocalAchievements(currentUser.id);
         }
       }
-    } else {
+      return;
+    }
+
+    if (event === 'USER_UPDATED') {
+      // Password successfully changed
+      closeResetModal();
+      showAuthToast('Password updated successfully!');
+      cleanUrl();
+      return;
+    }
+
+    if (event === 'SIGNED_OUT' || !currentUser) {
       localGamesSynced = false;
       renderLoggedOut();
+      return;
+    }
+
+    // INITIAL_SESSION with an existing session
+    if (currentUser) {
+      renderLoggedIn(currentUser);
+      if (!localGamesSynced) {
+        localGamesSynced = true;
+        await window.db.syncLocalGames(currentUser.id);
+        if (typeof window.syncLocalAchievements === 'function') {
+          await window.syncLocalAchievements(currentUser.id);
+        }
+      }
     }
   });
+
+  function cleanUrl() {
+    if (window.location.hash || window.location.search.includes('code=')) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  }
 
   // ─── Listen for game:end — nudge guests, save for signed-in ────
   document.addEventListener('game:end', async (e) => {
@@ -318,11 +416,17 @@
       });
     }
 
-    // Escape key closes modal
+    // Reset password form
+    const resetForm = document.getElementById('reset-password-form');
+    if (resetForm) resetForm.addEventListener('submit', handleSetNewPassword);
+
+    // Escape key closes modals
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        const modal = document.getElementById('auth-modal');
-        if (modal && !modal.hidden) closeAuthModal();
+        const authModal = document.getElementById('auth-modal');
+        if (authModal && !authModal.hidden) { resetSignupFlow(); closeAuthModal(); }
+        const resetModal = document.getElementById('reset-password-modal');
+        if (resetModal && !resetModal.hidden) closeResetModal();
       }
     });
   }

@@ -1558,6 +1558,44 @@ body {
   color: var(--text-dim);
 }
 
+/* ─── Auth toasts (sign-in confirmation, password updated etc.) ── */
+#auth-toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.auth-toast {
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 100px;
+  padding: 10px 20px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.auth-toast--success { border-color: rgba(74,222,128,0.3); }
+.auth-toast--error   { border-color: rgba(255,107,107,0.3); }
+
+.auth-toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ─── Achievement toasts ─────────────────────────────────────── */
 #achievement-toast-container {
   position: fixed;

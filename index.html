@@ -225,6 +225,28 @@
     </div>
   </div>
 
+  <!-- ─── Reset Password Modal ─────────────────────────────────── -->
+  <div id="reset-password-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Set new password">
+    <div class="modal-card">
+      <h2 class="modal-title">Set new password</h2>
+      <form id="reset-password-form" novalidate>
+        <div class="modal-field">
+          <label class="modal-label" for="reset-new-password">New password</label>
+          <input class="modal-input" id="reset-new-password" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="reset-confirm-password">Confirm password</label>
+          <input class="modal-input" id="reset-confirm-password" type="password" autocomplete="new-password" placeholder="Same again" />
+        </div>
+        <p class="modal-error auth-error" id="reset-error" hidden></p>
+        <button class="btn modal-submit-btn" type="submit" data-label="Update password">Update password</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── Auth Toasts ───────────────────────────────────────────── -->
+  <div id="auth-toast-container" aria-live="polite"></div>
+
   <!-- ─── Achievement Toasts ────────────────────────────────────── -->
   <div id="achievement-toast-container" aria-live="polite" aria-atomic="false"></div>
 
