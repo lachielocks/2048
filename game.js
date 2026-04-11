@@ -3,44 +3,116 @@
 
 // ─── Constants ───────────────────────────────────────────────────
 const SIZE = 4;
-const SLIDE_DURATION = 100; // ms — must match CSS --transition-slide
 const SPAWN_2_PROB = 0.9;
+const SLIDE_MS = 100; // must match CSS --transition-slide
 
-// ─── State ────────────────────────────────────────────────────────
-let board = [];           // 4×4 array of values (0 = empty)
+// ─── State ───────────────────────────────────────────────────────
+let grid;            // SIZE × SIZE array of Tile or null
 let score = 0;
 let best = 0;
-let gameOver = false;
 let won = false;
 let keepGoing = false;
+let isGameOver = false;
+let isAnimating = false;
+let nextId = 1;
 
-// Undo state
-let prevBoard = null;
+// Undo
+let prevSnapshot = null; // [[value,...]] of previous board
 let prevScore = 0;
-let canUndo = false;
 
 // ─── DOM refs ────────────────────────────────────────────────────
-const tilesContainer = document.getElementById('tiles-container');
-const boardCells     = document.getElementById('board-cells');
-const scoreEl        = document.getElementById('score');
-const bestEl         = document.getElementById('best');
-const newGameBtn     = document.getElementById('new-game-btn');
-const undoBtn        = document.getElementById('undo-btn');
-const winOverlay     = document.getElementById('win-overlay');
-const gameoverOverlay= document.getElementById('gameover-overlay');
-const keepGoingBtn   = document.getElementById('keep-going-btn');
-const winNewGameBtn  = document.getElementById('win-new-game-btn');
-const tryAgainBtn    = document.getElementById('try-again-btn');
-const winScoreEl     = document.getElementById('win-score');
-const gameoverScoreEl= document.getElementById('gameover-score');
-const logoEl         = document.querySelector('.logo');
+const tilesContainer  = document.getElementById('tiles-container');
+const boardCells      = document.getElementById('board-cells');
+const boardEl         = document.getElementById('board');
+const scoreEl         = document.getElementById('score');
+const bestEl          = document.getElementById('best');
+const newGameBtn      = document.getElementById('new-game-btn');
+const undoBtn         = document.getElementById('undo-btn');
+const winOverlay      = document.getElementById('win-overlay');
+const gameoverOverlay = document.getElementById('gameover-overlay');
+const keepGoingBtn    = document.getElementById('keep-going-btn');
+const winNewGameBtn   = document.getElementById('win-new-game-btn');
+const tryAgainBtn     = document.getElementById('try-again-btn');
+const winScoreEl      = document.getElementById('win-score');
+const gameoverScoreEl = document.getElementById('gameover-score');
+const logoEl          = document.querySelector('.logo');
 
-// ─── Init ─────────────────────────────────────────────────────────
+// ─── Cell sizing helper ──────────────────────────────────────────
+function getCellSize() {
+  const w = tilesContainer.clientWidth;
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
+  return { cell: (w - gap * (SIZE - 1)) / SIZE, gap };
+}
+
+// ─── Tile class ──────────────────────────────────────────────────
+class Tile {
+  constructor(row, col, value, isNew = true) {
+    this.id = nextId++;
+    this.row = row;
+    this.col = col;
+    this.value = value;
+
+    // Merge bookkeeping (set during move())
+    this.merging = false;
+    this.absorbedTile = null;
+    this.newValue = null;
+
+    this.el = document.createElement('div');
+    this.el.className = 'tile';
+    this.el.dataset.value = value;
+    this.el.textContent = value;
+    this.position();
+    tilesContainer.appendChild(this.el);
+
+    if (isNew) {
+      // Wait one frame so the spawn animation actually plays from scale 0
+      requestAnimationFrame(() => {
+        this.el.classList.add('tile-new');
+        this.el.addEventListener('animationend', () => {
+          this.el.classList.remove('tile-new');
+        }, { once: true });
+      });
+    }
+  }
+
+  position() {
+    const { cell, gap } = getCellSize();
+    if (cell <= 0) return;
+    this.el.style.width  = cell + 'px';
+    this.el.style.height = cell + 'px';
+    this.el.style.top    = (this.row * (cell + gap)) + 'px';
+    this.el.style.left   = (this.col * (cell + gap)) + 'px';
+  }
+
+  setValue(value) {
+    this.value = value;
+    this.el.dataset.value = value;
+    this.el.textContent = value;
+  }
+
+  remove() {
+    if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
+  }
+
+  popMerge() {
+    this.el.classList.remove('tile-merge', 'tile-merge-glow', 'tile-merge-halo', 'tile-merge-lightning');
+    void this.el.offsetWidth; // force reflow to restart animation
+    this.el.classList.add('tile-merge');
+    if (this.value >= 128)  this.el.classList.add('tile-merge-glow');
+    if (this.value >= 512)  this.el.classList.add('tile-merge-halo');
+    if (this.value >= 1024) this.el.classList.add('tile-merge-lightning');
+    setTimeout(() => {
+      this.el.classList.remove('tile-merge', 'tile-merge-glow', 'tile-merge-halo', 'tile-merge-lightning');
+    }, 600);
+  }
+}
+
+// ─── Init ────────────────────────────────────────────────────────
 function init() {
   best = parseInt(localStorage.getItem('best2048') || '0', 10);
   bestEl.textContent = best;
   buildCells();
-  startNewGame();
+  newGame();
   setupFooterCrossPromo();
 }
 
@@ -53,349 +125,248 @@ function buildCells() {
   }
 }
 
-// ─── New Game ─────────────────────────────────────────────────────
-function startNewGame() {
-  board = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+// ─── New game ────────────────────────────────────────────────────
+function newGame() {
+  tilesContainer.innerHTML = '';
+  grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
   score = 0;
-  gameOver = false;
+  isGameOver = false;
   won = false;
   keepGoing = false;
-  canUndo = false;
-  prevBoard = null;
+  isAnimating = false;
+  prevSnapshot = null;
+  prevScore = 0;
 
-  updateScoreDisplay(0);
+  scoreEl.textContent = '0';
   hideOverlays();
-  tilesContainer.innerHTML = '';
 
   spawnTile();
   spawnTile();
-  renderBoard();
 }
 
-// ─── Tile spawning ────────────────────────────────────────────────
+// ─── Spawn ───────────────────────────────────────────────────────
 function spawnTile() {
   const empty = [];
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
-      if (board[r][c] === 0) empty.push({ r, c });
+      if (!grid[r][c]) empty.push([r, c]);
     }
   }
-  if (empty.length === 0) return false;
-
-  const { r, c } = empty[Math.floor(Math.random() * empty.length)];
-  board[r][c] = Math.random() < SPAWN_2_PROB ? 2 : 4;
-  return { r, c, value: board[r][c] };
+  if (!empty.length) return null;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  const value = Math.random() < SPAWN_2_PROB ? 2 : 4;
+  const tile = new Tile(r, c, value, true);
+  grid[r][c] = tile;
+  return tile;
 }
 
-// ─── Rendering ────────────────────────────────────────────────────
-// Tile map: tracks DOM elements by unique id
-let tileMap = new Map(); // id → { el, r, c, value }
-let nextTileId = 1;
+// ─── Move ────────────────────────────────────────────────────────
+function move(dir) {
+  if (isAnimating || isGameOver) return;
+  if (won && !keepGoing) return;
 
-// Full re-render (used only at start)
-function renderBoard() {
-  tilesContainer.innerHTML = '';
-  tileMap.clear();
-  nextTileId = 1;
+  // Snapshot for undo & "did anything change?" check
+  const snapshot = serializeGrid();
+  const snapScore = score;
 
+  // Reset merge flags on every tile
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
-      if (board[r][c] !== 0) {
-        createTileEl(r, c, board[r][c], true);
+      const t = grid[r][c];
+      if (t) {
+        t.merging = false;
+        t.absorbedTile = null;
+        t.newValue = null;
       }
     }
   }
-}
 
-function createTileEl(r, c, value, isNew = false) {
-  const el = document.createElement('div');
-  el.className = 'tile';
-  el.dataset.value = value;
-  el.textContent = value;
-  setTilePosition(el, r, c);
-  tilesContainer.appendChild(el);
-
-  const id = nextTileId++;
-  tileMap.set(id, { el, r, c, value });
-
-  if (isNew) {
-    requestAnimationFrame(() => {
-      el.classList.add('tile-new');
-      el.addEventListener('animationend', () => el.classList.remove('tile-new'), { once: true });
-    });
-  }
-
-  return id;
-}
-
-function setTilePosition(el, r, c) {
-  const parent = tilesContainer;
-  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
-  const boardSize = parent.offsetWidth;
-  const cellSize = (boardSize - gap * (SIZE - 1)) / SIZE;
-
-  el.style.width  = cellSize + 'px';
-  el.style.height = cellSize + 'px';
-  el.style.top    = (r * (cellSize + gap)) + 'px';
-  el.style.left   = (c * (cellSize + gap)) + 'px';
-}
-
-function repositionAllTiles() {
-  for (const [, tile] of tileMap) {
-    setTilePosition(tile.el, tile.r, tile.c);
-  }
-}
-
-// ─── Move logic ───────────────────────────────────────────────────
-// Returns { moved: bool, addedScore: int, merges: [{r,c,value}] }
-function move(direction) {
-  // Save undo state before moving
-  const boardSnapshot = board.map(row => [...row]);
-  const scoreSnapshot = score;
-
+  const [dr, dc] = directionVector(dir);
+  const traversal = getTraversal(dir);
   let moved = false;
-  let addedScore = 0;
-  const merges = []; // positions that merged, {r, c, value, fromId, toId}
+  let scoreGain = 0;
 
-  // We'll use a parallel "id board" for tracking tiles
-  let idBoard = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
-  for (const [id, tile] of tileMap) {
-    idBoard[tile.r][tile.c] = id;
-  }
-
-  // Helper: process a single line of 4 cells
-  // Returns { newLine: [val,val,val,val], newIds: [id,...], mergedIds: [{id,value},...], scoreGain }
-  function processLine(vals, ids) {
-    // Filter out zeros
-    let filtered = [];
-    let filteredIds = [];
-    for (let i = 0; i < vals.length; i++) {
-      if (vals[i] !== 0) {
-        filtered.push(vals[i]);
-        filteredIds.push(ids[i]);
-      }
-    }
-
-    const merged = [];
-    const mergedIds = [];
-    let scoreGain = 0;
-
-    let i = 0;
-    while (i < filtered.length) {
-      if (i + 1 < filtered.length && filtered[i] === filtered[i + 1]) {
-        const newVal = filtered[i] * 2;
-        merged.push(newVal);
-        mergedIds.push({ fromId: filteredIds[i + 1], toId: filteredIds[i], value: newVal });
-        scoreGain += newVal;
-        i += 2;
-      } else {
-        merged.push(filtered[i]);
-        mergedIds.push({ fromId: null, toId: filteredIds[i], value: filtered[i] });
-        i++;
-      }
-    }
-
-    // Pad to SIZE
-    while (merged.length < SIZE) {
-      merged.push(0);
-      mergedIds.push({ fromId: null, toId: null, value: 0 });
-    }
-
-    return { newLine: merged, newIds: mergedIds, scoreGain };
-  }
-
-  // Build lines based on direction
-  const lines = [];
-  if (direction === 'left' || direction === 'right') {
-    for (let r = 0; r < SIZE; r++) {
-      let vals = board[r].slice();
-      let ids  = idBoard[r].slice();
-      if (direction === 'right') { vals.reverse(); ids.reverse(); }
-      lines.push({ r, vals, ids, reversed: direction === 'right' });
-    }
-  } else {
-    for (let c = 0; c < SIZE; c++) {
-      let vals = [], ids = [];
-      for (let r = 0; r < SIZE; r++) { vals.push(board[r][c]); ids.push(idBoard[r][c]); }
-      if (direction === 'down') { vals.reverse(); ids.reverse(); }
-      lines.push({ c, vals, ids, reversed: direction === 'down' });
-    }
-  }
-
-  // Process each line and write back
-  const newMoves = []; // { id, newR, newC, merged: bool, value, fromId }
-
-  for (const line of lines) {
-    const { newLine, newIds, scoreGain } = processLine(line.vals, line.ids);
-    addedScore += scoreGain;
-
-    let processedIds = newIds;
-    if (line.reversed) processedIds = processedIds.slice().reverse();
-
-    if (direction === 'left' || direction === 'right') {
-      for (let c = 0; c < SIZE; c++) {
-        const info = line.reversed ? processedIds[c] : processedIds[c];
-        const newVal = line.reversed ? newLine.slice().reverse()[c] : newLine[c];
-        board[line.r][c] = newVal;
-
-        if (info.toId !== null) {
-          newMoves.push({ id: info.toId, newR: line.r, newC: c, merged: info.fromId !== null, value: newVal, fromId: info.fromId });
-        }
-      }
-    } else {
-      const newLineResult = line.reversed ? newLine.slice().reverse() : newLine;
-      const idsResult = line.reversed ? processedIds.slice().reverse() : processedIds;
-      for (let r = 0; r < SIZE; r++) {
-        board[r][line.c] = newLineResult[r];
-        const info = idsResult[r];
-        if (info.toId !== null) {
-          newMoves.push({ id: info.toId, newR: r, newC: line.c, merged: info.fromId !== null, value: newLineResult[r], fromId: info.fromId });
-        }
-      }
-    }
-  }
-
-  // Check if anything moved
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      if (board[r][c] !== boardSnapshot[r][c]) { moved = true; break; }
-    }
-    if (moved) break;
-  }
-
-  if (!moved) return { moved: false, addedScore: 0, merges: [] };
-
-  // Save undo
-  prevBoard = boardSnapshot;
-  prevScore = scoreSnapshot;
-  canUndo = true;
-
-  // Animate tiles
-  const mergePositions = [];
-
-  for (const mv of newMoves) {
-    const tile = tileMap.get(mv.id);
+  for (const [r, c] of traversal) {
+    const tile = grid[r][c];
     if (!tile) continue;
 
-    // If there's a "from" tile that got absorbed, move it to same position first
-    if (mv.fromId !== null) {
-      const fromTile = tileMap.get(mv.fromId);
-      if (fromTile) {
-        setTilePosition(fromTile.el, mv.newR, mv.newC);
-        fromTile.r = mv.newR;
-        fromTile.c = mv.newC;
+    // Walk in direction until we hit edge or another tile
+    let nr = r, nc = c;
+    while (true) {
+      const tr = nr + dr;
+      const tc = nc + dc;
+      if (tr < 0 || tr >= SIZE || tc < 0 || tc >= SIZE) break;
+      if (grid[tr][tc]) break;
+      nr = tr;
+      nc = tc;
+    }
+
+    // Check the tile we stopped against — can it merge?
+    const tr = nr + dr;
+    const tc = nc + dc;
+    let mergeWith = null;
+    if (tr >= 0 && tr < SIZE && tc >= 0 && tc < SIZE) {
+      const next = grid[tr][tc];
+      if (next && next.value === tile.value && !next.merging) {
+        mergeWith = next;
       }
     }
 
-    // Move the main tile
-    tile.r = mv.newR;
-    tile.c = mv.newC;
-    setTilePosition(tile.el, mv.newR, mv.newC);
+    if (mergeWith) {
+      // Slide INTO mergeWith's cell
+      grid[r][c] = null;
+      tile.row = tr;
+      tile.col = tc;
+      tile.position();
 
-    if (mv.merged) {
-      mergePositions.push({ id: mv.id, fromId: mv.fromId, r: mv.newR, c: mv.newC, value: mv.value });
+      mergeWith.merging = true;
+      mergeWith.absorbedTile = tile;
+      mergeWith.newValue = mergeWith.value * 2;
+
+      scoreGain += mergeWith.newValue;
+      moved = true;
+    } else if (nr !== r || nc !== c) {
+      // Just slide
+      grid[r][c] = null;
+      grid[nr][nc] = tile;
+      tile.row = nr;
+      tile.col = nc;
+      tile.position();
+      moved = true;
     }
   }
 
-  // After slide animation: update merged tiles
-  setTimeout(() => {
-    for (const merge of mergePositions) {
-      // Remove the absorbed tile
-      if (merge.fromId !== null) {
-        const fromTile = tileMap.get(merge.fromId);
-        if (fromTile) {
-          fromTile.el.remove();
-          tileMap.delete(merge.fromId);
-        }
-      }
+  if (!moved) return;
 
-      // Update the surviving tile's value
-      const tile = tileMap.get(merge.id);
-      if (tile) {
-        tile.value = merge.value;
-        tile.el.dataset.value = merge.value;
-        tile.el.textContent = merge.value;
+  // Save undo state
+  prevSnapshot = snapshot;
+  prevScore = snapScore;
 
-        // Merge animation classes
-        tile.el.classList.remove('tile-merge', 'tile-merge-glow', 'tile-merge-halo', 'tile-merge-lightning');
-        void tile.el.offsetWidth; // reflow to restart animation
-        tile.el.classList.add('tile-merge');
+  if (scoreGain > 0) {
+    score += scoreGain;
+    updateScoreDisplay(scoreGain);
+  } else {
+    scoreEl.textContent = score;
+  }
 
-        if (merge.value >= 128) tile.el.classList.add('tile-merge-glow');
-        if (merge.value >= 512) tile.el.classList.add('tile-merge-halo');
-        if (merge.value >= 1024) tile.el.classList.add('tile-merge-lightning');
-
-        setTimeout(() => {
-          tile.el.classList.remove('tile-merge', 'tile-merge-glow', 'tile-merge-halo', 'tile-merge-lightning');
-        }, 500);
-
-        // Trigger confetti for notable merges
-        if (merge.value >= 512) {
-          const rect = tile.el.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height / 2;
-          const count = merge.value >= 2048 ? 150 : merge.value >= 1024 ? 80 : 40;
-          triggerConfetti(cx, cy, count);
-        }
-
-        merges.push({ r: merge.r, c: merge.c, value: merge.value });
-      }
-    }
-
-    // Spawn new tile
-    const spawned = spawnTile();
-    if (spawned) {
-      createTileEl(spawned.r, spawned.c, spawned.value, true);
-    }
-
-    // Update idBoard after merges
-    idBoard = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
-    for (const [id, tile] of tileMap) {
-      idBoard[tile.r][tile.c] = id;
-    }
-
-    // Check win
-    if (!keepGoing && !won) {
-      for (let r = 0; r < SIZE; r++) {
-        for (let c = 0; c < SIZE; c++) {
-          if (board[r][c] === 2048) {
-            won = true;
-            showWinOverlay();
-            // Pulse the logo
-            logoEl.classList.remove('win-pulse');
-            void logoEl.offsetWidth;
-            logoEl.classList.add('win-pulse');
-            logoEl.addEventListener('animationend', () => logoEl.classList.remove('win-pulse'), { once: true });
-            return;
-          }
-        }
-      }
-    }
-
-    // Check game over
-    if (!hasValidMoves()) {
-      gameOver = true;
-      showGameOverOverlay();
-    }
-
-  }, SLIDE_DURATION + 10);
-
-  return { moved: true, addedScore, merges };
+  isAnimating = true;
+  setTimeout(afterSlide, SLIDE_MS + 20);
 }
 
-// ─── Valid moves check ────────────────────────────────────────────
+function afterSlide() {
+  // Apply merges: swallow absorbed tiles, double the survivors
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const t = grid[r][c];
+      if (t && t.merging) {
+        if (t.absorbedTile) {
+          t.absorbedTile.remove();
+          t.absorbedTile = null;
+        }
+        t.setValue(t.newValue);
+        t.merging = false;
+        t.newValue = null;
+        t.popMerge();
+
+        // Confetti for big merges
+        if (t.value >= 512) {
+          const rect = t.el.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const count = t.value >= 2048 ? 150 : t.value >= 1024 ? 80 : 40;
+          if (typeof window.triggerConfetti === 'function') {
+            window.triggerConfetti(cx, cy, count);
+          }
+        }
+
+        // Win
+        if (t.value === 2048 && !won) {
+          won = true;
+          showWinOverlay();
+          pulseLogoOnWin();
+        }
+      }
+    }
+  }
+
+  spawnTile();
+
+  if (!hasValidMoves()) {
+    isGameOver = true;
+    showGameOverOverlay();
+  }
+
+  isAnimating = false;
+}
+
+// ─── Direction helpers ───────────────────────────────────────────
+function directionVector(dir) {
+  switch (dir) {
+    case 'left':  return [0, -1];
+    case 'right': return [0,  1];
+    case 'up':    return [-1, 0];
+    case 'down':  return [ 1, 0];
+  }
+  return [0, 0];
+}
+
+function getTraversal(dir) {
+  // Traverse from the wall outward so the closest tile to the wall moves first
+  let rows = [0, 1, 2, 3];
+  let cols = [0, 1, 2, 3];
+  if (dir === 'right') cols = [3, 2, 1, 0];
+  if (dir === 'down')  rows = [3, 2, 1, 0];
+  const order = [];
+  for (const r of rows) {
+    for (const c of cols) {
+      order.push([r, c]);
+    }
+  }
+  return order;
+}
+
+// ─── Game over check ─────────────────────────────────────────────
 function hasValidMoves() {
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
-      if (board[r][c] === 0) return true;
-      if (c + 1 < SIZE && board[r][c] === board[r][c + 1]) return true;
-      if (r + 1 < SIZE && board[r][c] === board[r + 1][c]) return true;
+      if (!grid[r][c]) return true;
+      const v = grid[r][c].value;
+      if (c + 1 < SIZE && grid[r][c + 1] && grid[r][c + 1].value === v) return true;
+      if (r + 1 < SIZE && grid[r + 1][c] && grid[r + 1][c].value === v) return true;
     }
   }
   return false;
 }
 
-// ─── Score ────────────────────────────────────────────────────────
+// ─── Serialize ───────────────────────────────────────────────────
+function serializeGrid() {
+  return grid.map(row => row.map(t => (t ? t.value : 0)));
+}
+
+// ─── Undo ────────────────────────────────────────────────────────
+function undoMove() {
+  if (!prevSnapshot || isAnimating) return;
+
+  tilesContainer.innerHTML = '';
+  grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const v = prevSnapshot[r][c];
+      if (v) {
+        grid[r][c] = new Tile(r, c, v, false);
+      }
+    }
+  }
+
+  score = prevScore;
+  scoreEl.textContent = score;
+  prevSnapshot = null;
+  isGameOver = false;
+  hideOverlays();
+}
+
+// ─── Score ───────────────────────────────────────────────────────
 function updateScoreDisplay(addedScore) {
   scoreEl.textContent = score;
   if (score > best) {
@@ -403,10 +374,7 @@ function updateScoreDisplay(addedScore) {
     bestEl.textContent = best;
     localStorage.setItem('best2048', best);
   }
-
-  if (addedScore > 0) {
-    showScorePop(addedScore);
-  }
+  if (addedScore > 0) showScorePop(addedScore);
 }
 
 function showScorePop(n) {
@@ -418,7 +386,7 @@ function showScorePop(n) {
   pop.addEventListener('animationend', () => pop.remove(), { once: true });
 }
 
-// ─── Overlays ─────────────────────────────────────────────────────
+// ─── Overlays ────────────────────────────────────────────────────
 function showWinOverlay() {
   winScoreEl.textContent = score.toLocaleString();
   winOverlay.hidden = false;
@@ -434,110 +402,89 @@ function hideOverlays() {
   gameoverOverlay.hidden = true;
 }
 
-// ─── Undo ─────────────────────────────────────────────────────────
-function undoMove() {
-  if (!canUndo || !prevBoard) return;
-  board = prevBoard.map(row => [...row]);
-  score = prevScore;
-  canUndo = false;
-  prevBoard = null;
-  gameOver = false;
-
-  updateScoreDisplay(0);
-  hideOverlays();
-
-  // Full re-render
-  tilesContainer.innerHTML = '';
-  tileMap.clear();
-  nextTileId = 1;
-  renderBoard();
+function pulseLogoOnWin() {
+  logoEl.classList.remove('win-pulse');
+  void logoEl.offsetWidth;
+  logoEl.classList.add('win-pulse');
 }
 
-// ─── Input handling ───────────────────────────────────────────────
-function handleDirection(dir) {
-  if (gameOver) return;
-  if (won && !keepGoing) return;
-
-  const result = move(dir);
-  if (result.moved) {
-    score += result.addedScore;
-    updateScoreDisplay(result.addedScore);
-  }
-}
-
-// Keyboard
-document.addEventListener('keydown', (e) => {
-  const map = {
-    ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
-    a: 'left', d: 'right', w: 'up', s: 'down',
-    A: 'left', D: 'right', W: 'up', S: 'down',
-  };
-  if (map[e.key]) {
-    e.preventDefault();
-    handleDirection(map[e.key]);
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-    e.preventDefault();
-    undoMove();
-  }
+// ─── Resize handling ─────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (grid && grid[r][c]) grid[r][c].position();
+      }
+    }
+  }, 80);
 });
 
-// Prevent page scroll on arrow keys
+// ─── Keyboard ────────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
-  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+  // Undo: Ctrl+Z / Cmd+Z
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
+    undoMove();
+    return;
+  }
+
+  let dir = null;
+  switch (e.key) {
+    case 'ArrowLeft':  case 'a': case 'A': dir = 'left';  break;
+    case 'ArrowRight': case 'd': case 'D': dir = 'right'; break;
+    case 'ArrowUp':    case 'w': case 'W': dir = 'up';    break;
+    case 'ArrowDown':  case 's': case 'S': dir = 'down';  break;
+  }
+  if (dir) {
+    e.preventDefault(); // also blocks page scroll on arrows
+    move(dir);
   }
 }, { passive: false });
 
-// Touch / pointer swipe
-(function setupSwipe() {
-  const board = document.getElementById('board');
-  let startX = 0, startY = 0;
-  const MIN_SWIPE = 30;
+// ─── Pointer / touch swipe ───────────────────────────────────────
+let pStartX = 0, pStartY = 0, pStarted = false;
+const MIN_SWIPE = 30;
 
-  board.addEventListener('pointerdown', (e) => {
-    startX = e.clientX;
-    startY = e.clientY;
-  }, { passive: true });
+boardEl.addEventListener('pointerdown', (e) => {
+  pStartX = e.clientX;
+  pStartY = e.clientY;
+  pStarted = true;
+}, { passive: true });
 
-  board.addEventListener('pointerup', (e) => {
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
+boardEl.addEventListener('pointerup', (e) => {
+  if (!pStarted) return;
+  pStarted = false;
+  const dx = e.clientX - pStartX;
+  const dy = e.clientY - pStartY;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < MIN_SWIPE) return;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    move(dx > 0 ? 'right' : 'left');
+  } else {
+    move(dy > 0 ? 'down' : 'up');
+  }
+}, { passive: true });
 
-    if (Math.max(absDx, absDy) < MIN_SWIPE) return;
+boardEl.addEventListener('pointercancel', () => { pStarted = false; }, { passive: true });
 
-    if (absDx > absDy) {
-      handleDirection(dx > 0 ? 'right' : 'left');
-    } else {
-      handleDirection(dy > 0 ? 'down' : 'up');
-    }
-  }, { passive: true });
-})();
+// Block native scroll while interacting with the board
+boardEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-// Button handlers
-newGameBtn.addEventListener('click', startNewGame);
+// ─── Buttons ─────────────────────────────────────────────────────
+newGameBtn.addEventListener('click', newGame);
 undoBtn.addEventListener('click', undoMove);
 keepGoingBtn.addEventListener('click', () => {
   keepGoing = true;
   hideOverlays();
 });
-winNewGameBtn.addEventListener('click', startNewGame);
-tryAgainBtn.addEventListener('click', startNewGame);
+winNewGameBtn.addEventListener('click', newGame);
+tryAgainBtn.addEventListener('click', newGame);
 
-// ─── Resize handler ───────────────────────────────────────────────
-let resizeTimer;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(repositionAllTiles, 80);
-});
-
-// ─── Footer cross-promo ───────────────────────────────────────────
+// ─── Footer cross-promo ──────────────────────────────────────────
 function setupFooterCrossPromo() {
   const el = document.getElementById('footer-cross-promo');
   const hostname = window.location.hostname;
-
   if (hostname === '2048.lachiethurlow.com') {
     el.innerHTML = 'Also available at <a href="https://2048.transnology.co" target="_blank" rel="noopener noreferrer">2048.transnology.co</a>';
   } else if (hostname === '2048.transnology.co') {
@@ -547,5 +494,9 @@ function setupFooterCrossPromo() {
   }
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', init);
+// ─── Boot ────────────────────────────────────────────────────────
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
