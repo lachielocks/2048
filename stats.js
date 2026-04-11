@@ -150,7 +150,7 @@
       const unlocked = a.key in unlockedMap;
       const date = unlockedMap[a.key] ? fmtDate(unlockedMap[a.key]) : null;
       return `
-        <div class="achievement-grid-item ${unlocked ? 'achievement-grid-item--unlocked' : ''}" title="${unlocked && date ? 'Unlocked ' + date : a.description}">
+        <div class="achievement-grid-item ${unlocked ? 'achievement-grid-item--unlocked' : ''}" data-tooltip="${escHtml(a.description)}${unlocked && date ? ' · Unlocked ' + date : ''}">
           <div class="achievement-grid-icon">${unlocked ? '🏆' : '🔒'}</div>
           <div class="achievement-grid-label">${escHtml(a.label)}</div>
         </div>`;
