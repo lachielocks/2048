@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>2048</title>
+  <meta name="description" content="A polished 2048 game. Join the numbers and get to the 2048 tile!" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Geist:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <div class="wrapper">
+    <header class="header">
+      <div class="header-left">
+        <h1 class="logo">2048</h1>
+        <p class="subtitle">Join the numbers and get to the <strong>2048 tile!</strong></p>
+      </div>
+      <div class="header-right">
+        <div class="scores">
+          <div class="score-box" id="score-box">
+            <span class="score-label">SCORE</span>
+            <span class="score-value" id="score">0</span>
+          </div>
+          <div class="score-box" id="best-box">
+            <span class="score-label">BEST</span>
+            <span class="score-value" id="best">0</span>
+          </div>
+        </div>
+        <div class="buttons">
+          <button class="btn" id="new-game-btn" aria-label="New Game">New Game</button>
+          <button class="btn btn-secondary" id="undo-btn" aria-label="Undo last move">Undo</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="game-container">
+      <div class="board" id="board" role="grid" aria-label="2048 game board">
+        <div class="board-cells" id="board-cells" aria-hidden="true"></div>
+        <div class="tiles-container" id="tiles-container"></div>
+      </div>
+
+      <div class="overlay" id="win-overlay" role="dialog" aria-modal="true" aria-label="You win!" hidden>
+        <div class="overlay-content">
+          <p class="overlay-title win-title">You win! 🎉</p>
+          <p class="overlay-score-text">Score: <span id="win-score">0</span></p>
+          <div class="overlay-buttons">
+            <button class="btn btn-overlay" id="keep-going-btn">Keep Going</button>
+            <button class="btn btn-overlay btn-secondary" id="win-new-game-btn">New Game</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="gameover-overlay" role="dialog" aria-modal="true" aria-label="Game over" hidden>
+        <div class="overlay-content">
+          <p class="overlay-title">Game over</p>
+          <p class="overlay-score-text">Score: <span id="gameover-score">0</span></p>
+          <div class="overlay-buttons">
+            <button class="btn btn-overlay" id="try-again-btn">Try Again</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <section class="how-to-play" aria-label="How to play">
+      <strong>HOW TO PLAY:</strong> Use your <strong>arrow keys</strong> or <strong>WASD</strong> to move the tiles.
+      Tiles with the same number <strong>merge into one</strong> when they touch.
+      Add them up to reach <strong>2048!</strong>
+    </section>
+
+    <footer class="footer">
+      <p class="footer-credit">
+        A fun project by
+        <a href="https://lachiethurlow.com" target="_blank" rel="noopener noreferrer">Lachie Thurlow</a>
+        &amp;
+        <a href="https://transnology.co" target="_blank" rel="noopener noreferrer">Transnology</a>
+      </p>
+      <p class="footer-cross-promo" id="footer-cross-promo"></p>
+    </footer>
+  </div>
+
+  <script src="confetti.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
