@@ -700,9 +700,6 @@ body {
   transition: width 300ms ease, opacity 300ms ease;
 }
 
-.powerup-bar-fill.partial {
-  opacity: 0.4;
-}
 
 /* ─── Tile interaction (swap / delete modes) ─────────────────── */
 .board.mode-swap .tiles-container,

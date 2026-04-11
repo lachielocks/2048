@@ -20,15 +20,10 @@ let nextId = 1;
 let prevSnapshot = null; // [[value,...]] of previous board
 let prevScore = 0;
 
-// Power-up uses & progress (reset each new game)
+// Power-up uses (reset each new game)
 let swapUses = 0;
 let deleteUses = 0;
-let swapUnlocked = false;
-let deleteUnlocked = false;
-let swapProgress = 0;    // 0.0–1.0, progress toward next use
-let deleteProgress = 0;
 const MAX_USES = 3;
-const PROGRESS_PER_MERGE = 1 / 3; // ~3 qualifying merges = 1 banked use
 
 // Active power-up mode
 let activeMode = null; // 'swap' | 'delete' | null
@@ -173,10 +168,6 @@ function newGame() {
   prevScore = 0;
   swapUses = 0;
   deleteUses = 0;
-  swapUnlocked = false;
-  deleteUnlocked = false;
-  swapProgress = 0;
-  deleteProgress = 0;
 
   scoreEl.textContent = '0';
   hideOverlays();
@@ -290,17 +281,9 @@ function afterSlide() {
         t.newValue = null;
         t.popMerge();
 
-        // Award power-up progress
-        if (t.value >= 256 && swapUses < MAX_USES) {
-          if (!swapUnlocked) swapUnlocked = true;
-          swapProgress += PROGRESS_PER_MERGE;
-          if (swapProgress >= 1) { swapProgress -= 1; swapUses++; }
-        }
-        if (t.value >= 512 && deleteUses < MAX_USES) {
-          if (!deleteUnlocked) deleteUnlocked = true;
-          deleteProgress += PROGRESS_PER_MERGE;
-          if (deleteProgress >= 1) { deleteProgress -= 1; deleteUses++; }
-        }
+        // Award power-up uses
+        if (t.value >= 256) swapUses   = Math.min(MAX_USES, swapUses + 1);
+        if (t.value >= 512) deleteUses = Math.min(MAX_USES, deleteUses + 1);
 
         // Confetti
         if (t.value >= 512) {
@@ -538,21 +521,9 @@ tilesContainer.addEventListener('mouseout', (e) => {
 });
 
 // ─── Power-up UI sync ────────────────────────────────────────────
-function updateBarFills(fills, uses, progress, unlocked) {
+function updateBarFills(fills, uses) {
   for (let i = 0; i < MAX_USES; i++) {
-    const fill = fills[i];
-    if (uses > i) {
-      // Fully banked segment
-      fill.style.width = '100%';
-      fill.classList.remove('partial');
-    } else if (uses === i && unlocked && progress > 0) {
-      // Partially filled (progress toward next use)
-      fill.style.width = (progress * 100).toFixed(1) + '%';
-      fill.classList.add('partial');
-    } else {
-      fill.style.width = '0%';
-      fill.classList.remove('partial');
-    }
+    fills[i].style.width = uses > i ? '100%' : '0%';
   }
 }
 
@@ -563,44 +534,32 @@ function updatePowerUpUI() {
   undoSubEl.textContent = hasUndo ? 'Last move' : 'No moves yet';
 
   // Swap
-  if (!swapUnlocked) {
-    // Never reached 256 yet
-    swapBtnEl.classList.add('locked');
-    swapBtnEl.classList.remove('active', 'unavailable');
-    swapBadgeEl.hidden = true;
-    if (activeMode !== 'swap') swapSubEl.textContent = 'Reach 256';
-  } else if (swapUses === 0) {
-    // Unlocked but earning toward first use
-    swapBtnEl.classList.remove('locked', 'active');
-    swapBtnEl.classList.add('unavailable');
-    swapBadgeEl.hidden = true;
-    if (activeMode !== 'swap') swapSubEl.textContent = '';
-  } else {
-    swapBtnEl.classList.remove('locked', 'unavailable');
+  if (swapUses > 0) {
+    swapBtnEl.classList.remove('locked');
     swapBadgeEl.hidden = false;
     swapBadgeEl.textContent = '×' + swapUses;
     if (activeMode !== 'swap') swapSubEl.textContent = '';
+  } else {
+    swapBtnEl.classList.add('locked');
+    swapBtnEl.classList.remove('active');
+    swapBadgeEl.hidden = true;
+    if (activeMode !== 'swap') swapSubEl.textContent = 'Reach 256';
   }
-  updateBarFills(swapFills, swapUses, swapProgress, swapUnlocked);
+  updateBarFills(swapFills, swapUses);
 
   // Delete
-  if (!deleteUnlocked) {
-    deleteBtnEl.classList.add('locked');
-    deleteBtnEl.classList.remove('active', 'unavailable');
-    deleteBadgeEl.hidden = true;
-    if (activeMode !== 'delete') deleteSubEl.textContent = 'Reach 512';
-  } else if (deleteUses === 0) {
-    deleteBtnEl.classList.remove('locked', 'active');
-    deleteBtnEl.classList.add('unavailable');
-    deleteBadgeEl.hidden = true;
-    if (activeMode !== 'delete') deleteSubEl.textContent = '';
-  } else {
-    deleteBtnEl.classList.remove('locked', 'unavailable');
+  if (deleteUses > 0) {
+    deleteBtnEl.classList.remove('locked');
     deleteBadgeEl.hidden = false;
     deleteBadgeEl.textContent = '×' + deleteUses;
     if (activeMode !== 'delete') deleteSubEl.textContent = '';
+  } else {
+    deleteBtnEl.classList.add('locked');
+    deleteBtnEl.classList.remove('active');
+    deleteBadgeEl.hidden = true;
+    if (activeMode !== 'delete') deleteSubEl.textContent = 'Reach 512';
   }
-  updateBarFills(deleteFills, deleteUses, deleteProgress, deleteUnlocked);
+  updateBarFills(deleteFills, deleteUses);
 }
 
 // ─── Score ───────────────────────────────────────────────────────
