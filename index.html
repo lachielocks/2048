@@ -169,7 +169,17 @@
         <button class="btn modal-submit-btn" type="submit" data-label="Create account">Create account</button>
       </form>
       <!-- Shown after successful sign-up (outside form so form.hidden doesn't bury it) -->
-      <p class="modal-info modal-info--confirm" id="signup-confirm-msg" hidden>Almost there! Check your email (including junk/spam) for a confirmation link, then come back and sign in.</p>
+      <div id="signup-confirm-block" hidden>
+        <p class="modal-info modal-info--confirm">Check your email (including junk/spam) — we sent a 6-digit code. Enter it below or click the link in the email.</p>
+        <form id="auth-form-otp" novalidate>
+          <div class="modal-field">
+            <label class="modal-label" for="signup-otp">Confirmation code</label>
+            <input class="modal-input modal-input--otp" id="signup-otp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" placeholder="123456" maxlength="6" />
+          </div>
+          <p class="modal-error auth-error" id="otp-error" hidden></p>
+          <button class="btn modal-submit-btn" type="submit" data-label="Confirm">Confirm</button>
+        </form>
+      </div>
     </div>
   </div>
 

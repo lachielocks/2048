@@ -8,6 +8,7 @@
   let currentUser = null;
   let hasCompletedGame = false;
   let localGamesSynced = false;
+  let pendingVerifyEmail = null; // email awaiting OTP confirmation
 
   // ─── Public API ────────────────────────────────────────────────
   window.getCurrentUser = () => currentUser;
@@ -189,10 +190,45 @@
     if (error) {
       showAuthError('signup-error', error.message);
     } else {
-      showAuthError('signup-error', '');
-      const confirmEl = document.getElementById('signup-confirm-msg');
-      if (confirmEl) confirmEl.hidden = false;
+      pendingVerifyEmail = email;
       form.hidden = true;
+      const block = document.getElementById('signup-confirm-block');
+      if (block) {
+        block.hidden = false;
+        block.querySelector('#signup-otp')?.focus();
+      }
+    }
+  }
+
+  // ─── OTP verification ──────────────────────────────────────────
+  async function handleOtpVerify(e) {
+    e.preventDefault();
+    clearAuthErrors();
+    const token = document.getElementById('signup-otp')?.value.trim();
+
+    if (!token || token.length !== 6) {
+      showAuthError('otp-error', 'Enter the 6-digit code from your email.');
+      return;
+    }
+    if (!pendingVerifyEmail) {
+      showAuthError('otp-error', 'Session expired — please sign up again.');
+      return;
+    }
+
+    const form = e.target;
+    setAuthLoading(form, true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: pendingVerifyEmail,
+      token,
+      type: 'signup',
+    });
+    setAuthLoading(form, false);
+
+    if (error) {
+      showAuthError('otp-error', error.message);
+    } else {
+      pendingVerifyEmail = null;
+      closeAuthModal();
     }
   }
 
@@ -249,9 +285,20 @@
   });
 
   // ─── Wire up modal forms after DOM ready ───────────────────────
+  function resetSignupFlow() {
+    const form = document.getElementById('auth-form-signup');
+    const block = document.getElementById('signup-confirm-block');
+    const otpInput = document.getElementById('signup-otp');
+    if (form) form.hidden = false;
+    if (block) block.hidden = true;
+    if (otpInput) otpInput.value = '';
+    pendingVerifyEmail = null;
+  }
+
   function wireModal() {
     const signinForm = document.getElementById('auth-form-signin');
     const signupForm = document.getElementById('auth-form-signup');
+    const otpForm = document.getElementById('auth-form-otp');
     const tabSignin = document.getElementById('auth-tab-signin');
     const tabSignup = document.getElementById('auth-tab-signup');
     const forgotLink = document.getElementById('auth-forgot-link');
@@ -260,13 +307,14 @@
 
     if (signinForm) signinForm.addEventListener('submit', handleSignIn);
     if (signupForm) signupForm.addEventListener('submit', handleSignUp);
-    if (tabSignin) tabSignin.addEventListener('click', () => { clearAuthErrors(); setAuthTab('signin'); });
+    if (otpForm) otpForm.addEventListener('submit', handleOtpVerify);
+    if (tabSignin) tabSignin.addEventListener('click', () => { clearAuthErrors(); resetSignupFlow(); setAuthTab('signin'); });
     if (tabSignup) tabSignup.addEventListener('click', () => { clearAuthErrors(); setAuthTab('signup'); });
     if (forgotLink) forgotLink.addEventListener('click', handleForgotPassword);
-    if (closeBtn) closeBtn.addEventListener('click', closeAuthModal);
+    if (closeBtn) closeBtn.addEventListener('click', () => { resetSignupFlow(); closeAuthModal(); });
     if (backdrop) {
       backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) closeAuthModal();
+        if (e.target === backdrop) { resetSignupFlow(); closeAuthModal(); }
       });
     }
 

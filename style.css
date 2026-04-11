@@ -1178,7 +1178,15 @@ body {
   padding: 12px 14px;
   color: rgba(255,255,255,0.75);
   line-height: 1.5;
-  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.modal-input--otp {
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-align: center;
 }
 
 .modal-submit-btn {
