@@ -385,6 +385,36 @@ html, body {
 
 .confirm-backdrop[hidden] { display: none; }
 
+.ach-card { max-width: 480px; }
+
+.ach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.ach-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.ach-check-row input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--orange);
+  flex-shrink: 0;
+}
+
+.ach-check-label strong {
+  color: var(--text);
+}
+
 .confirm-card {
   background: var(--card);
   border: 1px solid var(--border);

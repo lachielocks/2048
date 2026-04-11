@@ -5,45 +5,43 @@ const adminDb = window.db.client;
 let currentUser = null;
 
 // ─── Demo board presets ───────────────────────────────────────────
+// Each demo shows two equal tiles ready to merge into the featured value
 const DEMO_BOARDS = {
   nearwin: {
     board: [
-      [1024, 1024, 512, 128],
-      [256,  64,   32,  16],
-      [8,    4,    2,   0],
-      [0,    0,    0,   0],
+      [512,  512, 256, 128],
+      [64,   32,  16,   8],
+      [4,     2,   0,   0],
+      [0,     0,   0,   0],
     ],
-    score: 4832,
+    score: 2336,
   },
   2048: {
     board: [
-      [2048, 1024, 128, 32],
-      [512,  256,  64,  16],
-      [8,    4,    2,   0],
-      [0,    0,    0,   0],
+      [1024, 1024, 512, 256],
+      [128,   64,  32,  16],
+      [8,      4,   0,   0],
+      [0,      0,   0,   0],
     ],
-    score: 7680,
-    won: true,
+    score: 6560,
   },
   4096: {
     board: [
-      [4096, 2048, 256, 64],
-      [1024, 512,  128, 32],
-      [16,   8,    4,   2],
-      [0,    0,    0,   0],
+      [2048, 2048, 1024, 512],
+      [256,  128,   64,  32],
+      [16,     8,    0,   0],
+      [0,      0,    0,   0],
     ],
-    score: 18432,
-    won: true,
+    score: 15232,
   },
   8192: {
     board: [
-      [8192, 4096, 1024, 256],
-      [2048, 512,  128,  64],
-      [32,   16,   8,    4],
-      [2,    0,    0,    0],
+      [4096, 4096, 2048, 1024],
+      [512,  256,  128,    64],
+      [32,    16,    0,     0],
+      [0,      0,    0,     0],
     ],
-    score: 40960,
-    won: true,
+    score: 34688,
   },
 };
 
@@ -137,7 +135,7 @@ async function loadUsers() {
       <td>
         <div class="actions-cell">
           <button class="btn-admin" onclick="clearUserGames('${u.id}','${esc(u.display_name)}')">Clear Games</button>
-          <button class="btn-admin" onclick="clearUserAchievements('${u.id}','${esc(u.display_name)}')">Reset Achievements</button>
+          <button class="btn-admin" onclick="openAchievementsModal('${u.id}','${esc(u.display_name)}')">Achievements</button>
           ${!u.is_admin ? `<button class="btn-admin btn-admin--danger" onclick="deleteUser('${u.id}','${esc(u.display_name)}')">Delete</button>` : ''}
         </div>
       </td>
@@ -168,6 +166,66 @@ async function deleteUser(userId, name) {
   loadUsers();
   loadOverview();
 }
+
+// ─── Achievement force-unlock ─────────────────────────────────────
+const ALL_ACHIEVEMENTS = [
+  { key: 'first_game',      label: 'First Move',       desc: 'Complete your first game' },
+  { key: 'first_win',       label: '2048 Club',         desc: 'Reach the 2048 tile' },
+  { key: 'tile_4096',       label: 'Going Further',     desc: 'Reach the 4096 tile' },
+  { key: 'tile_8192',       label: 'Legendary',         desc: 'Reach the 8192 tile' },
+  { key: 'no_undo_win',     label: 'Purist',            desc: 'Win without using Undo' },
+  { key: 'no_powerup_win',  label: 'Raw Skill',         desc: 'Win without any power-ups' },
+  { key: 'score_10k',       label: 'Ten Thousand',      desc: 'Score 10,000+ in one game' },
+  { key: 'score_50k',       label: 'Fifty Thousand',    desc: 'Score 50,000+ in one game' },
+  { key: 'speed_win',       label: 'Speed Run',         desc: 'Win in under 5 minutes' },
+  { key: 'comeback',        label: 'Comeback Kid',      desc: 'Win using all three power-ups' },
+];
+
+let achievementTargetUserId = null;
+
+async function openAchievementsModal(userId, name) {
+  achievementTargetUserId = userId;
+  document.getElementById('ach-modal-title').textContent = `Achievements — ${name}`;
+
+  // Fetch currently unlocked
+  const { data: unlocked } = await adminDb.from('achievements').select('key').eq('user_id', userId);
+  const unlockedKeys = new Set((unlocked || []).map(r => r.key));
+
+  const list = document.getElementById('ach-checkbox-list');
+  list.innerHTML = ALL_ACHIEVEMENTS.map(a => `
+    <label class="ach-check-row">
+      <input type="checkbox" name="ach" value="${a.key}" ${unlockedKeys.has(a.key) ? 'checked' : ''} />
+      <span class="ach-check-label"><strong>${a.label}</strong> — ${a.desc}</span>
+    </label>`).join('');
+
+  document.getElementById('ach-modal').hidden = false;
+}
+
+async function saveAchievements() {
+  const checked = [...document.querySelectorAll('#ach-checkbox-list input[name="ach"]:checked')]
+    .map(el => el.value);
+  if (!achievementTargetUserId) return;
+
+  if (checked.length === 0) {
+    toast('No achievements selected.', 'danger'); return;
+  }
+
+  const rows = checked.map(key => ({ user_id: achievementTargetUserId, key }));
+  const { error } = await adminDb.from('achievements').upsert(rows, { onConflict: 'user_id,key', ignoreDuplicates: true });
+  if (error) { toast('Failed: ' + error.message, 'danger'); return; }
+
+  toast(`Unlocked ${checked.length} achievement(s).`);
+  closeAchievementsModal();
+}
+
+function closeAchievementsModal() {
+  document.getElementById('ach-modal').hidden = true;
+  achievementTargetUserId = null;
+}
+
+window.openAchievementsModal = openAchievementsModal;
+window.saveAchievements = saveAchievements;
+window.closeAchievementsModal = closeAchievementsModal;
 
 // Make these global so onclick attributes work
 window.clearUserGames = clearUserGames;

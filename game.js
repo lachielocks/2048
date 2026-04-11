@@ -33,6 +33,9 @@ let swapFirstTile = null;
 let isAutoplay = false;
 let autoplayTimer = null;
 
+// Set true for AI or demo games — skips best-score update + game:end event
+let isUntrackedGame = false;
+
 // Game tracking (for saving + achievements)
 let moveCount = 0;
 let gameStartTime = null;
@@ -176,6 +179,7 @@ function newGame() {
   gameStartTime = null;
   undoUsed = false;
   powerupUsed = false;
+  isUntrackedGame = false;
 
   scoreEl.textContent = '0';
   hideOverlays();
@@ -193,6 +197,7 @@ function newGame() {
           if (demo.board[r][c]) grid[r][c] = new Tile(r, c, demo.board[r][c], false);
       if (demo.score) { score = demo.score; scoreEl.textContent = score; updateScoreDisplay(0); }
       if (demo.won)   { won = true; }
+      isUntrackedGame = true; // demo games don't count
       return;
     } catch {}
   }
@@ -602,7 +607,7 @@ function updatePowerUpUI() {
 // ─── Score ───────────────────────────────────────────────────────
 function updateScoreDisplay(addedScore) {
   scoreEl.textContent = score;
-  if (score > best) {
+  if (score > best && !isUntrackedGame && !isAutoplay) {
     best = score;
     bestEl.textContent = best;
     localStorage.setItem('best2048', best);
@@ -621,6 +626,9 @@ function showScorePop(n) {
 
 // ─── Game end dispatch + localStorage save ────────────────────────
 function dispatchGameEnd(isWon) {
+  // AI autoplay and admin demo games never count toward scores or leaderboards
+  if (isAutoplay || isUntrackedGame) return;
+
   const durationSeconds = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
   const highestTile = getHighestTile();
   const boardState = serializeGrid();
@@ -774,6 +782,7 @@ function startAutoplay() {
   if (isGameOver) return;
   if (won && !keepGoing) return;
   isAutoplay = true;
+  isUntrackedGame = true;
   aiBtnEl.textContent = 'Stop AI';
   aiBtnEl.classList.add('active');
   setActiveMode(null);
