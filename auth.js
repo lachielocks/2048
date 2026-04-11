@@ -154,6 +154,16 @@
   }
 
   // ─── Sign in ───────────────────────────────────────────────────
+  // Race a promise against a timeout so a hung client can't lock the UI forever.
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+      ),
+    ]);
+  }
+
   async function handleSignIn(e) {
     e.preventDefault();
     clearAuthErrors();
@@ -166,7 +176,25 @@
 
     setAuthLoading(form, true);
     suppressSignInToast = true;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    console.log('[auth] signInWithPassword start', { email });
+    let result;
+    try {
+      result = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15000,
+        'signInWithPassword'
+      );
+      console.log('[auth] signInWithPassword resolved', result);
+    } catch (err) {
+      console.error('[auth] signInWithPassword threw/timed out:', err);
+      suppressSignInToast = false;
+      setAuthLoading(form, false);
+      showAuthError('signin-error', err.message || 'Sign in failed — please try again.');
+      return;
+    }
+
+    const { error } = result || {};
     if (error) suppressSignInToast = false;
     setAuthLoading(form, false);
 
