@@ -221,27 +221,48 @@ window.loadUsers = loadUsers;
 window.loadRecentGames = loadRecentGames;
 
 // ─── Auth gate ────────────────────────────────────────────────────
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { redirect(); return; }
+  try {
+    console.log('[admin] getSession start');
+    const { data, error: sessionError } = await withTimeout(
+      supabase.auth.getSession(),
+      10000, 'getSession'
+    );
+    console.log('[admin] getSession done', { session: !!data?.session, sessionError });
 
-  currentUser = session.user;
+    if (sessionError || !data?.session) { redirect(); return; }
+    currentUser = data.session.user;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('display_name, is_admin')
-    .eq('id', currentUser.id)
-    .single();
+    console.log('[admin] fetching profile');
+    const { data: profile, error: profileError } = await withTimeout(
+      supabase.from('profiles').select('display_name, is_admin').eq('id', currentUser.id).single(),
+      10000, 'profile fetch'
+    );
+    console.log('[admin] profile done', { profile, profileError });
 
-  if (!profile?.is_admin) { redirect(); return; }
+    if (profileError || !profile?.is_admin) { redirect(); return; }
 
-  // Show UI
-  document.getElementById('auth-gate').hidden = true;
-  document.getElementById('admin-ui').hidden = false;
-  document.getElementById('admin-user-name').textContent = profile.display_name || currentUser.email;
+    // Show UI
+    document.getElementById('auth-gate').hidden = true;
+    document.getElementById('admin-ui').hidden = false;
+    document.getElementById('admin-user-name').textContent = profile.display_name || currentUser.email;
 
-  // Load all data
-  await Promise.all([loadOverview(), loadUsers(), loadRecentGames()]);
+    // Load all data
+    await Promise.all([loadOverview(), loadUsers(), loadRecentGames()]);
+  } catch (err) {
+    console.error('[admin] init failed:', err);
+    document.querySelector('.gate-msg').textContent = `Error: ${err.message} — redirecting…`;
+    setTimeout(() => { window.location.href = '/'; }, 2000);
+  }
 }
 
 function redirect() {
