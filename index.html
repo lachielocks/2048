@@ -34,7 +34,6 @@
         </div>
         <div class="buttons">
           <button class="btn" id="new-game-btn" aria-label="New Game">New Game</button>
-          <button class="btn btn-secondary" id="undo-btn" aria-label="Undo last move">Undo</button>
         </div>
       </div>
     </header>
@@ -66,6 +65,31 @@
         </div>
       </div>
     </main>
+
+    <section class="powerups" aria-label="Power-ups">
+      <!-- Undo -->
+      <button class="powerup-btn" id="undo-btn" aria-label="Undo last move">
+        <span class="powerup-icon">↩</span>
+        <span class="powerup-label">Undo</span>
+        <span class="powerup-sub" id="undo-sub">Last move</span>
+      </button>
+
+      <!-- Swap -->
+      <button class="powerup-btn locked" id="swap-btn" aria-label="Swap two tiles">
+        <span class="powerup-badge" id="swap-badge" hidden></span>
+        <span class="powerup-icon">⇄</span>
+        <span class="powerup-label">Swap</span>
+        <span class="powerup-sub" id="swap-sub">Make a 256</span>
+      </button>
+
+      <!-- Delete -->
+      <button class="powerup-btn locked" id="delete-btn" aria-label="Delete all tiles of a number">
+        <span class="powerup-badge" id="delete-badge" hidden></span>
+        <span class="powerup-icon">✕</span>
+        <span class="powerup-label">Delete</span>
+        <span class="powerup-sub" id="delete-sub">Make a 512</span>
+      </button>
+    </section>
 
     <section class="how-to-play" aria-label="How to play">
       <strong>HOW TO PLAY:</strong> Use your <strong>arrow keys</strong> or <strong>WASD</strong> to move the tiles.
