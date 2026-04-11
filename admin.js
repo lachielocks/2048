@@ -1,7 +1,7 @@
 /* admin.js — Admin dashboard logic */
 'use strict';
 
-const supabase = window.db.client;
+const adminDb = window.db.client;
 let currentUser = null;
 
 // ─── Demo board presets ───────────────────────────────────────────
@@ -103,7 +103,7 @@ function confirm(msg) {
 
 // ─── Overview stats ───────────────────────────────────────────────
 async function loadOverview() {
-  const { data, error } = await supabase.rpc('admin_overview');
+  const { data, error } = await adminDb.rpc('admin_overview');
   if (error || !data?.[0]) return;
   const d = data[0];
   document.getElementById('ov-users').textContent = Number(d.total_users).toLocaleString();
@@ -117,7 +117,7 @@ async function loadOverview() {
 async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
   tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Loading…</td></tr>`;
-  const { data, error } = await supabase.rpc('admin_user_list');
+  const { data, error } = await adminDb.rpc('admin_user_list');
   if (error || !data) {
     tbody.innerHTML = `<tr><td colspan="7" class="table-empty">Failed to load users.</td></tr>`;
     return;
@@ -146,7 +146,7 @@ async function loadUsers() {
 
 async function clearUserGames(userId, name) {
   if (!await confirm(`Delete all games for "${name}"? This cannot be undone.`)) return;
-  const { error } = await supabase.from('games').delete().eq('user_id', userId);
+  const { error } = await adminDb.from('games').delete().eq('user_id', userId);
   if (error) { toast('Failed: ' + error.message, 'danger'); return; }
   toast(`Games cleared for ${name}.`);
   loadUsers();
@@ -155,14 +155,14 @@ async function clearUserGames(userId, name) {
 
 async function clearUserAchievements(userId, name) {
   if (!await confirm(`Reset all achievements for "${name}"?`)) return;
-  const { error } = await supabase.from('achievements').delete().eq('user_id', userId);
+  const { error } = await adminDb.from('achievements').delete().eq('user_id', userId);
   if (error) { toast('Failed: ' + error.message, 'danger'); return; }
   toast(`Achievements reset for ${name}.`);
 }
 
 async function deleteUser(userId, name) {
   if (!await confirm(`Permanently delete "${name}" and all their data? This cannot be undone.`)) return;
-  const { error } = await supabase.rpc('admin_delete_user', { target_user_id: userId });
+  const { error } = await adminDb.rpc('admin_delete_user', { target_user_id: userId });
   if (error) { toast('Failed: ' + error.message, 'danger'); return; }
   toast(`${name} deleted.`);
   loadUsers();
@@ -179,7 +179,7 @@ async function loadRecentGames() {
   const tbody = document.getElementById('games-tbody');
   tbody.innerHTML = `<tr><td colspan="8" class="table-empty">Loading…</td></tr>`;
 
-  const { data, error } = await supabase
+  const { data, error } = await adminDb
     .from('games')
     .select('id, score, highest_tile, moves, duration_seconds, won, mode, created_at, profiles(display_name)')
     .order('created_at', { ascending: false })
@@ -209,7 +209,7 @@ async function loadRecentGames() {
 
 async function deleteGame(gameId) {
   if (!await confirm('Delete this game record?')) return;
-  const { error } = await supabase.from('games').delete().eq('id', gameId);
+  const { error } = await adminDb.from('games').delete().eq('id', gameId);
   if (error) { toast('Failed: ' + error.message, 'danger'); return; }
   toast('Game deleted.');
   loadRecentGames();
@@ -234,7 +234,7 @@ async function init() {
   try {
     console.log('[admin] getSession start');
     const { data, error: sessionError } = await withTimeout(
-      supabase.auth.getSession(),
+      adminDb.auth.getSession(),
       10000, 'getSession'
     );
     console.log('[admin] getSession done', { session: !!data?.session, sessionError });
@@ -244,7 +244,7 @@ async function init() {
 
     console.log('[admin] fetching profile');
     const { data: profile, error: profileError } = await withTimeout(
-      supabase.from('profiles').select('display_name, is_admin').eq('id', currentUser.id).single(),
+      adminDb.from('profiles').select('display_name, is_admin').eq('id', currentUser.id).single(),
       10000, 'profile fetch'
     );
     console.log('[admin] profile done', { profile, profileError });
