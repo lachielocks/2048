@@ -182,6 +182,21 @@ function newGame() {
   updatePowerUpUI();
   document.dispatchEvent(new CustomEvent('game:new'));
 
+  // Check for a demo board injected by the admin panel
+  const demoRaw = localStorage.getItem('demo_board');
+  if (demoRaw) {
+    localStorage.removeItem('demo_board');
+    try {
+      const demo = JSON.parse(demoRaw);
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (demo.board[r][c]) grid[r][c] = new Tile(r, c, demo.board[r][c], false);
+      if (demo.score) { score = demo.score; scoreEl.textContent = score; updateScoreDisplay(0); }
+      if (demo.won)   { won = true; }
+      return;
+    } catch {}
+  }
+
   spawnTile();
   spawnTile();
 }

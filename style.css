@@ -988,6 +988,11 @@ body {
   color: #ff6b6b;
 }
 
+a.auth-dropdown-item {
+  display: block;
+  text-decoration: none;
+}
+
 /* ─── Modal backdrop ─────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;

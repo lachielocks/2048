@@ -17,6 +17,9 @@ const STATIC_ASSETS = [
   '/stats.js',
   '/logo.svg',
   '/manifest.json',
+  '/admin.html',
+  '/admin.css',
+  '/admin.js',
 ];
 
 // ─── Install: pre-cache all static assets ────────────────────────

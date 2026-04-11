@@ -55,6 +55,7 @@
         <span class="avatar-name">${truncated}</span>
         <div class="auth-dropdown" id="auth-dropdown" hidden>
           <button class="auth-dropdown-item" id="stats-open-btn">My Stats</button>
+          ${isAdmin ? `<a class="auth-dropdown-item" href="/admin.html">Admin Panel</a>` : ''}
           <button class="auth-dropdown-item auth-dropdown-item--danger" id="sign-out-btn">Sign out</button>
         </div>
       </div>`;
@@ -305,6 +306,18 @@
     }, 3500);
   }
 
+  // ─── Admin check ───────────────────────────────────────────────
+  let isAdmin = false;
+
+  async function checkAdmin(userId) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .single();
+    isAdmin = data?.is_admin || false;
+  }
+
   // ─── Auth state change ─────────────────────────────────────────
   // Track whether a sign-in was triggered by our own forms (suppress toast for those)
   let suppressSignInToast = false;
@@ -321,6 +334,7 @@
     }
 
     if (event === 'SIGNED_IN') {
+      await checkAdmin(currentUser.id);
       renderLoggedIn(currentUser);
       if (!suppressSignInToast) {
         // Came from an email link or magic link redirect
@@ -355,6 +369,7 @@
 
     // INITIAL_SESSION with an existing session
     if (currentUser) {
+      await checkAdmin(currentUser.id);
       renderLoggedIn(currentUser);
       if (!localGamesSynced) {
         localGamesSynced = true;

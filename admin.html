@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — 2048</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Geist:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+  <!-- Auth gate -->
+  <div id="auth-gate">
+    <div class="gate-spinner"></div>
+    <p class="gate-msg">Checking access…</p>
+  </div>
+
+  <!-- Admin UI (hidden until auth confirmed) -->
+  <div id="admin-ui" hidden>
+
+    <header class="admin-header">
+      <div class="admin-header-left">
+        <span class="admin-logo">2048</span>
+        <span class="admin-badge">Admin</span>
+      </div>
+      <div class="admin-header-right">
+        <span id="admin-user-name" class="admin-user"></span>
+        <a href="/" class="admin-back-link">← Back to game</a>
+      </div>
+    </header>
+
+    <main class="admin-main">
+
+      <!-- Overview -->
+      <section class="admin-section">
+        <h2 class="section-title">Overview</h2>
+        <div class="stat-grid" id="overview-grid">
+          <div class="stat-card"><div class="stat-val" id="ov-users">—</div><div class="stat-key">Total Users</div></div>
+          <div class="stat-card"><div class="stat-val" id="ov-games">—</div><div class="stat-key">Total Games</div></div>
+          <div class="stat-card"><div class="stat-val" id="ov-week">—</div><div class="stat-key">Games This Week</div></div>
+          <div class="stat-card"><div class="stat-val" id="ov-winrate">—</div><div class="stat-key">Win Rate</div></div>
+        </div>
+      </section>
+
+      <!-- Demo boards -->
+      <section class="admin-section">
+        <h2 class="section-title">Demo Boards</h2>
+        <p class="section-desc">Load a preset board into the game to showcase tile animations.</p>
+        <div class="demo-grid">
+          <div class="demo-card" data-demo="nearwin">
+            <div class="demo-tile demo-tile--1024">1024</div>
+            <div class="demo-info">
+              <div class="demo-label">Near Win</div>
+              <div class="demo-desc">Two 1024 tiles ready to merge</div>
+            </div>
+            <button class="btn-admin btn-admin--primary" onclick="launchDemo('nearwin')">Launch</button>
+          </div>
+          <div class="demo-card" data-demo="2048">
+            <div class="demo-tile demo-tile--2048">2048</div>
+            <div class="demo-info">
+              <div class="demo-label">Demo 2048</div>
+              <div class="demo-desc">Shimmer tile, won state</div>
+            </div>
+            <button class="btn-admin btn-admin--primary" onclick="launchDemo('2048')">Launch</button>
+          </div>
+          <div class="demo-card" data-demo="4096">
+            <div class="demo-tile demo-tile--4096">4096</div>
+            <div class="demo-info">
+              <div class="demo-label">Demo 4096</div>
+              <div class="demo-desc">Galaxy spin animation</div>
+            </div>
+            <button class="btn-admin btn-admin--primary" onclick="launchDemo('4096')">Launch</button>
+          </div>
+          <div class="demo-card" data-demo="8192">
+            <div class="demo-tile demo-tile--8192">8192</div>
+            <div class="demo-info">
+              <div class="demo-label">Demo 8192</div>
+              <div class="demo-desc">Legendary tile</div>
+            </div>
+            <button class="btn-admin btn-admin--primary" onclick="launchDemo('8192')">Launch</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Users -->
+      <section class="admin-section">
+        <div class="section-header">
+          <h2 class="section-title">Users</h2>
+          <button class="btn-admin" onclick="loadUsers()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table" id="users-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Joined</th>
+                <th>Games</th>
+                <th>Best Score</th>
+                <th>Best Tile</th>
+                <th>Admin</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="7" class="table-empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Recent games -->
+      <section class="admin-section">
+        <div class="section-header">
+          <h2 class="section-title">Recent Games</h2>
+          <button class="btn-admin" onclick="loadRecentGames()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table" id="games-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Score</th>
+                <th>Best Tile</th>
+                <th>Moves</th>
+                <th>Duration</th>
+                <th>Result</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="games-tbody">
+              <tr><td colspan="8" class="table-empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Confirm dialog -->
+  <div id="confirm-modal" class="confirm-backdrop" hidden>
+    <div class="confirm-card">
+      <p class="confirm-msg" id="confirm-msg"></p>
+      <div class="confirm-actions">
+        <button class="btn-admin btn-admin--danger" id="confirm-ok">Confirm</button>
+        <button class="btn-admin" id="confirm-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-toast-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
