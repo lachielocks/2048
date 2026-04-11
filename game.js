@@ -33,6 +33,12 @@ let swapFirstTile = null;
 let isAutoplay = false;
 let autoplayTimer = null;
 
+// Game tracking (for saving + achievements)
+let moveCount = 0;
+let gameStartTime = null;
+let undoUsed = false;
+let powerupUsed = false;
+
 // ─── DOM refs ────────────────────────────────────────────────────
 const tilesContainer  = document.getElementById('tiles-container');
 const boardCells      = document.getElementById('board-cells');
@@ -166,10 +172,15 @@ function newGame() {
   prevScore = 0;
   swapUses = 0;
   deleteUses = 0;
+  moveCount = 0;
+  gameStartTime = null;
+  undoUsed = false;
+  powerupUsed = false;
 
   scoreEl.textContent = '0';
   hideOverlays();
   updatePowerUpUI();
+  document.dispatchEvent(new CustomEvent('game:new'));
 
   spawnTile();
   spawnTile();
@@ -196,6 +207,8 @@ function move(dir) {
   if (isAnimating || activeMode) return;
   if (isGameOver) return;
   if (won && !keepGoing) return;
+
+  if (!gameStartTime) gameStartTime = Date.now();
 
   const snapshot = serializeGrid();
   const snapScore = score;
@@ -254,6 +267,7 @@ function move(dir) {
 
   if (!moved) return;
 
+  moveCount++;
   prevSnapshot = snapshot;
   prevScore = snapScore;
 
@@ -263,6 +277,10 @@ function move(dir) {
   } else {
     scoreEl.textContent = score;
   }
+
+  document.dispatchEvent(new CustomEvent('game:move', {
+    detail: { score, highestTile: getHighestTile(), moveCount }
+  }));
 
   isAnimating = true;
   setTimeout(afterSlide, SLIDE_MS + 20);
@@ -347,6 +365,15 @@ function hasValidMoves() {
   return false;
 }
 
+// ─── Highest tile helper ─────────────────────────────────────────
+function getHighestTile() {
+  let max = 0;
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] && grid[r][c].value > max) max = grid[r][c].value;
+  return max;
+}
+
 // ─── Serialize ───────────────────────────────────────────────────
 function serializeGrid() {
   return grid.map(row => row.map(t => (t ? t.value : 0)));
@@ -356,6 +383,7 @@ function serializeGrid() {
 function undoMove() {
   if (!prevSnapshot || isAnimating) return;
 
+  undoUsed = true;
   setActiveMode(null);
   tilesContainer.innerHTML = '';
   grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
@@ -407,6 +435,7 @@ function setActiveMode(mode) {
 
 // ─── Power-up: swap ──────────────────────────────────────────────
 function doSwap(tileA, tileB) {
+  powerupUsed = true;
   prevSnapshot = serializeGrid();
   prevScore = score;
 
@@ -433,6 +462,7 @@ function doSwap(tileA, tileB) {
 
 // ─── Power-up: delete ────────────────────────────────────────────
 function doDelete(value) {
+  powerupUsed = true;
   prevSnapshot = serializeGrid();
   prevScore = score;
 
@@ -574,13 +604,36 @@ function showScorePop(n) {
   pop.addEventListener('animationend', () => pop.remove(), { once: true });
 }
 
+// ─── Game end dispatch + localStorage save ────────────────────────
+function dispatchGameEnd(isWon) {
+  const durationSeconds = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
+  const highestTile = getHighestTile();
+  const boardState = serializeGrid();
+
+  document.dispatchEvent(new CustomEvent('game:end', { detail: {
+    score, highestTile, moves: moveCount,
+    durationSeconds, won: isWon, boardState,
+    undoUsed, powerupUsed, mode: 'classic',
+  }}));
+
+  // Persist to localStorage for guest sync later
+  try {
+    const games = JSON.parse(localStorage.getItem('games2048') || '[]');
+    games.push({ score, highestTile, moves: moveCount, durationSeconds, won: isWon, mode: 'classic', boardState, createdAt: Date.now() });
+    if (games.length > 10) games.splice(0, games.length - 10);
+    localStorage.setItem('games2048', JSON.stringify(games));
+  } catch {}
+}
+
 // ─── Overlays ────────────────────────────────────────────────────
 function showWinOverlay() {
+  dispatchGameEnd(true);
   winScoreEl.textContent = score.toLocaleString();
   winOverlay.hidden = false;
 }
 
 function showGameOverOverlay() {
+  dispatchGameEnd(false);
   gameoverScoreEl.textContent = score.toLocaleString();
   gameoverOverlay.hidden = false;
 }

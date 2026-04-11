@@ -33,6 +33,7 @@
           </div>
         </div>
         <div class="buttons">
+          <div id="auth-header-slot"></div>
           <button class="btn" id="ai-btn" aria-label="Watch AI play">Watch AI</button>
           <button class="btn" id="new-game-btn" aria-label="New Game">New Game</button>
         </div>
@@ -102,6 +103,10 @@
       </main>
     </div>
 
+    <div class="below-board-actions">
+      <button class="btn" id="leaderboard-btn">Leaderboard</button>
+    </div>
+
     <section class="how-to-play" aria-label="How to play">
       <strong>HOW TO PLAY:</strong> Use your <strong>arrow keys</strong> or <strong>WASD</strong> to move the tiles.
       Tiles with the same number <strong>merge into one</strong> when they touch.
@@ -119,6 +124,105 @@
     </footer>
   </div>
 
+  <!-- ─── Auth Modal ─────────────────────────────────────────────── -->
+  <div id="auth-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Sign in or sign up">
+    <div class="modal-card">
+      <button class="modal-close-btn" id="auth-modal-close" aria-label="Close">✕</button>
+      <h2 class="modal-title">Welcome</h2>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="auth-tab-signin">Sign in</button>
+        <button class="modal-tab" id="auth-tab-signup">Sign up</button>
+      </div>
+
+      <!-- Sign in form -->
+      <form id="auth-form-signin" novalidate>
+        <div class="modal-field">
+          <label class="modal-label" for="signin-email">Email</label>
+          <input class="modal-input" id="signin-email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="signin-password">Password</label>
+          <input class="modal-input" id="signin-password" type="password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+        <p class="modal-error auth-error" id="signin-error" hidden></p>
+        <p class="modal-info" id="signin-reset-msg" hidden>Password reset email sent — check your inbox.</p>
+        <button class="btn modal-submit-btn" type="submit" data-label="Sign in">Sign in</button>
+        <button type="button" class="modal-link" id="auth-forgot-link">Forgot password?</button>
+      </form>
+
+      <!-- Sign up form -->
+      <form id="auth-form-signup" hidden novalidate>
+        <div class="modal-field">
+          <label class="modal-label" for="signup-name">Display name</label>
+          <input class="modal-input" id="signup-name" type="text" autocomplete="nickname" placeholder="Your name" maxlength="32" />
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="signup-email">Email</label>
+          <input class="modal-input" id="signup-email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="signup-password">Password</label>
+          <input class="modal-input" id="signup-password" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
+        </div>
+        <p class="modal-error auth-error" id="signup-error" hidden></p>
+        <p class="modal-info" id="signup-confirm-msg" hidden>Check your email to confirm your account, then sign in.</p>
+        <button class="btn modal-submit-btn" type="submit" data-label="Create account">Create account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── Leaderboard Modal ──────────────────────────────────────── -->
+  <div id="leaderboard-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="Leaderboard">
+    <div class="modal-card modal-card--wide">
+      <button class="modal-close-btn" id="lb-close-btn" aria-label="Close">✕</button>
+      <div class="modal-header-row">
+        <h2 class="modal-title">Leaderboard</h2>
+        <button class="btn btn-icon" id="lb-refresh-btn" aria-label="Refresh">↻</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="lb-tab-top">Top Scores</button>
+        <button class="modal-tab" id="lb-tab-tile">Highest Tile</button>
+        <button class="modal-tab" id="lb-tab-week">This Week</button>
+      </div>
+
+      <div class="lb-table-wrapper">
+        <table class="lb-table">
+          <thead id="lb-thead">
+            <tr><th>Rank</th><th>Player</th><th>Score</th><th>Best Tile</th></tr>
+          </thead>
+          <tbody id="lb-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="lb-signin-cta" class="modal-cta-bar" hidden>
+        <p>Sign in to appear on the leaderboard.</p>
+        <button class="btn">Sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Stats Modal ────────────────────────────────────────────── -->
+  <div id="stats-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-label="My Stats">
+    <div class="modal-card modal-card--wide">
+      <button class="modal-close-btn" id="stats-close-btn" aria-label="Close">✕</button>
+      <h2 class="modal-title">My Stats</h2>
+      <div id="stats-content" class="stats-content">
+        <div class="stats-loading">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Achievement Toasts ────────────────────────────────────── -->
+  <div id="achievement-toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="auth.js"></script>
+  <script src="achievements.js"></script>
+  <script src="leaderboard.js"></script>
+  <script src="stats.js"></script>
   <script src="confetti.js"></script>
   <script src="solver.js"></script>
   <script src="game.js"></script>
