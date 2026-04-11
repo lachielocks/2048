@@ -15,7 +15,7 @@ const STATIC_ASSETS = [
   '/achievements.js',
   '/leaderboard.js',
   '/stats.js',
-  '/logo.png',
+  '/logo.svg',
   '/manifest.json',
 ];
 

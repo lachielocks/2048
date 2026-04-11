@@ -10,9 +10,9 @@
   "categories": ["games"],
   "icons": [
     {
-      "src": "/logo.png",
-      "sizes": "1080x1080",
-      "type": "image/png",
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
