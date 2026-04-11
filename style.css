@@ -566,10 +566,18 @@ body {
   line-height: 1.5;
 }
 
+/* ─── Game area (board + powerups wrapper) ───────────────────── */
+.game-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* ─── Power-ups ──────────────────────────────────────────────── */
 .powerups {
   display: flex;
   gap: 8px;
+  order: 1; /* below board on mobile */
 }
 
 .powerup-btn {
@@ -609,24 +617,6 @@ body {
   box-shadow: 0 0 20px rgba(255,107,43,0.25), inset 0 0 12px rgba(255,107,43,0.06);
 }
 
-/* Badge — use counter */
-.powerup-badge {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  font-family: var(--font-title);
-  font-weight: 700;
-  font-size: 11px;
-  line-height: 1;
-  background: var(--orange);
-  color: #fff;
-  border-radius: 100px;
-  padding: 3px 6px;
-  min-width: 20px;
-  text-align: center;
-}
-
-.powerup-badge[hidden] { display: none; }
 
 /* Icon */
 .powerup-icon {
@@ -667,6 +657,31 @@ body {
   opacity: 0.3;
   cursor: default;
 }
+
+/* ─── Power-up progress bar ──────────────────────────────────── */
+.powerup-bar {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  height: 5px;
+  margin-top: 2px;
+}
+
+.powerup-bar-seg {
+  flex: 1;
+  background: #2a2a2a;
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.powerup-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--orange);
+  border-radius: 100px;
+  transition: width 300ms ease, opacity 300ms ease;
+}
+
 
 /* ─── Tile interaction (swap / delete modes) ─────────────────── */
 .board.mode-swap .tiles-container,
@@ -722,6 +737,56 @@ body {
   0%   { transform: scale(1);   opacity: 1; }
   60%  { transform: scale(1.1); opacity: 0.6; }
   100% { transform: scale(0);   opacity: 0; }
+}
+
+/* ─── Active button state (e.g. AI running) ─────────────────── */
+.btn.active {
+  background: var(--orange);
+  color: #fff;
+  border-color: var(--orange);
+  box-shadow: 0 0 16px rgba(255,107,43,0.4);
+}
+
+/* ─── Desktop layout ─────────────────────────────────────────── */
+@media (min-width: 580px) {
+  .wrapper {
+    max-width: 640px;
+  }
+
+  .game-area {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  /* Powerups become a left vertical column */
+  .powerups {
+    order: -1;
+    flex-direction: column;
+    width: 82px;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  /* Board fills remaining space */
+  .game-container {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Powerup buttons fill the column width */
+  .powerup-btn {
+    width: 100%;
+    flex: none;
+  }
+
+  /* Logo goes horizontal */
+  .logo {
+    flex-direction: row;
+    font-size: clamp(42px, 6vw, 68px);
+    line-height: 1;
+    letter-spacing: -2px;
+    gap: 0;
+  }
 }
 
 /* ─── Responsive adjustments ──────────────────────────────────── */

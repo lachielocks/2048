@@ -29,6 +29,10 @@ const MAX_USES = 3;
 let activeMode = null; // 'swap' | 'delete' | null
 let swapFirstTile = null;
 
+// AI autoplay
+let isAutoplay = false;
+let autoplayTimer = null;
+
 // ─── DOM refs ────────────────────────────────────────────────────
 const tilesContainer  = document.getElementById('tiles-container');
 const boardCells      = document.getElementById('board-cells');
@@ -45,15 +49,20 @@ const winScoreEl      = document.getElementById('win-score');
 const gameoverScoreEl = document.getElementById('gameover-score');
 const logoEl          = document.querySelector('.logo');
 
+// AI button DOM ref
+const aiBtnEl = document.getElementById('ai-btn');
+
 // Power-up DOM refs
 const undoBtnEl    = document.getElementById('undo-btn');
 const swapBtnEl    = document.getElementById('swap-btn');
 const deleteBtnEl  = document.getElementById('delete-btn');
-const swapBadgeEl  = document.getElementById('swap-badge');
-const deleteBadgeEl= document.getElementById('delete-badge');
 const undoSubEl    = document.getElementById('undo-sub');
 const swapSubEl    = document.getElementById('swap-sub');
 const deleteSubEl  = document.getElementById('delete-sub');
+
+// Progress bar fill elements (3 per power-up)
+const swapFills   = [0, 1, 2].map(i => document.getElementById('swap-fill-'   + i));
+const deleteFills = [0, 1, 2].map(i => document.getElementById('delete-fill-' + i));
 
 // ─── Cell sizing helper ──────────────────────────────────────────
 function getCellSize() {
@@ -144,6 +153,7 @@ function buildCells() {
 
 // ─── New game ────────────────────────────────────────────────────
 function newGame() {
+  stopAutoplay();
   setActiveMode(null);
   tilesContainer.innerHTML = '';
   grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
@@ -389,18 +399,10 @@ function setActiveMode(mode) {
   swapBtnEl.classList.toggle('active', mode === 'swap');
   deleteBtnEl.classList.toggle('active', mode === 'delete');
 
-  // Update subtext to reflect mode state
-  if (mode === 'swap') {
-    swapSubEl.textContent = 'Click 1st tile';
-  } else if (swapUses > 0) {
-    swapSubEl.textContent = '';
-  }
-
-  if (mode === 'delete') {
-    deleteSubEl.textContent = 'Click any tile';
-  } else if (deleteUses > 0) {
-    deleteSubEl.textContent = '';
-  }
+  // Set mode-entry instructions; clearing is handled by updatePowerUpUI
+  if (mode === 'swap')   swapSubEl.textContent   = 'Click 1st tile';
+  if (mode === 'delete') deleteSubEl.textContent = 'Click any tile';
+  if (!mode) updatePowerUpUI();
 }
 
 // ─── Power-up: swap ──────────────────────────────────────────────
@@ -421,7 +423,6 @@ function doSwap(tileA, tileB) {
 
   swapUses--;
   setActiveMode(null);
-  updatePowerUpUI();
 
   // If board was game over, re-check after swap
   if (isGameOver && hasValidMoves()) {
@@ -449,7 +450,6 @@ function doDelete(value) {
 
   deleteUses--;
   setActiveMode(null);
-  updatePowerUpUI();
 
   if (isGameOver && hasValidMoves()) {
     isGameOver = false;
@@ -519,6 +519,12 @@ tilesContainer.addEventListener('mouseout', (e) => {
 });
 
 // ─── Power-up UI sync ────────────────────────────────────────────
+function updateBarFills(fills, uses) {
+  for (let i = 0; i < MAX_USES; i++) {
+    fills[i].style.width = uses > i ? '100%' : '0%';
+  }
+}
+
 function updatePowerUpUI() {
   // Undo
   const hasUndo = !!prevSnapshot;
@@ -528,28 +534,24 @@ function updatePowerUpUI() {
   // Swap
   if (swapUses > 0) {
     swapBtnEl.classList.remove('locked');
-    swapBadgeEl.hidden = false;
-    swapBadgeEl.textContent = '×' + swapUses;
     if (activeMode !== 'swap') swapSubEl.textContent = '';
   } else {
     swapBtnEl.classList.add('locked');
     swapBtnEl.classList.remove('active');
-    swapBadgeEl.hidden = true;
-    swapSubEl.textContent = 'Make a 256';
+    if (activeMode !== 'swap') swapSubEl.textContent = 'Reach 256';
   }
+  updateBarFills(swapFills, swapUses);
 
   // Delete
   if (deleteUses > 0) {
     deleteBtnEl.classList.remove('locked');
-    deleteBadgeEl.hidden = false;
-    deleteBadgeEl.textContent = '×' + deleteUses;
     if (activeMode !== 'delete') deleteSubEl.textContent = '';
   } else {
     deleteBtnEl.classList.add('locked');
     deleteBtnEl.classList.remove('active');
-    deleteBadgeEl.hidden = true;
-    deleteSubEl.textContent = 'Make a 512';
+    if (activeMode !== 'delete') deleteSubEl.textContent = 'Reach 512';
   }
+  updateBarFills(deleteFills, deleteUses);
 }
 
 // ─── Score ───────────────────────────────────────────────────────
@@ -622,6 +624,8 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (isAutoplay) return; // AI has control
+
   let dir = null;
   switch (e.key) {
     case 'ArrowLeft':  case 'a': case 'A': dir = 'left';  break;
@@ -640,8 +644,8 @@ let pStartX = 0, pStartY = 0, pStarted = false;
 const MIN_SWIPE = 30;
 
 boardEl.addEventListener('pointerdown', (e) => {
-  // Don't initiate swipe if a power-up mode is active (tile clicks handle those)
-  if (activeMode) return;
+  // Don't initiate swipe if a power-up mode is active or AI is running
+  if (activeMode || isAutoplay) return;
   pStartX = e.clientX;
   pStartY = e.clientY;
   pStarted = true;
@@ -662,6 +666,7 @@ boardEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fals
 
 // ─── Buttons ─────────────────────────────────────────────────────
 newGameBtn.addEventListener('click', newGame);
+aiBtnEl.addEventListener('click', toggleAutoplay);
 
 undoBtnEl.addEventListener('click', undoMove);
 
@@ -683,6 +688,50 @@ keepGoingBtn.addEventListener('click', () => {
 });
 winNewGameBtn.addEventListener('click', newGame);
 tryAgainBtn.addEventListener('click', newGame);
+
+// ─── AI Autoplay ─────────────────────────────────────────────────
+function toggleAutoplay() {
+  if (isAutoplay) {
+    stopAutoplay();
+  } else {
+    startAutoplay();
+  }
+}
+
+function startAutoplay() {
+  if (isGameOver) return;
+  if (won && !keepGoing) return;
+  isAutoplay = true;
+  aiBtnEl.textContent = 'Stop AI';
+  aiBtnEl.classList.add('active');
+  setActiveMode(null);
+  scheduleAiMove();
+}
+
+function stopAutoplay() {
+  isAutoplay = false;
+  clearTimeout(autoplayTimer);
+  autoplayTimer = null;
+  aiBtnEl.textContent = 'Watch AI';
+  aiBtnEl.classList.remove('active');
+}
+
+function scheduleAiMove() {
+  if (!isAutoplay) return;
+  autoplayTimer = setTimeout(doAiMove, 320);
+}
+
+function doAiMove() {
+  if (!isAutoplay) return;
+  if (isGameOver || (won && !keepGoing)) { stopAutoplay(); return; }
+  if (isAnimating) { scheduleAiMove(); return; }
+
+  const board = serializeGrid();
+  const dir = window.getBestMove(board);
+  if (!dir) { stopAutoplay(); return; }
+  move(dir);
+  scheduleAiMove();
+}
 
 // ─── Footer cross-promo ──────────────────────────────────────────
 function setupFooterCrossPromo() {
