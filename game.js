@@ -161,7 +161,12 @@ function buildCells() {
 }
 
 // ─── New game ────────────────────────────────────────────────────
+// suppressReset: true when restoring a saved state — skips the cloud-clear hook
+let suppressReset = false;
+
 function newGame() {
+  if (!suppressReset) window.onGameReset?.();
+  suppressReset = false;
   stopAutoplay();
   setActiveMode(null);
   tilesContainer.innerHTML = '';
@@ -848,6 +853,44 @@ function setupFooterCrossPromo() {
     el.innerHTML = 'Available at <a href="https://2048.lachiethurlow.com" target="_blank" rel="noopener noreferrer">2048.lachiethurlow.com</a> and <a href="https://2048.transnology.co" target="_blank" rel="noopener noreferrer">2048.transnology.co</a>';
   }
 }
+
+// ─── Autosave API ────────────────────────────────────────────────
+window.getGameState = function () {
+  if (moveCount === 0 && score === 0) return null; // nothing worth saving
+  const board = [];
+  for (let r = 0; r < SIZE; r++) {
+    board.push([]);
+    for (let c = 0; c < SIZE; c++) board[r].push(grid[r][c] ? grid[r][c].value : 0);
+  }
+  return {
+    board, score, moveCount, won, keepGoing,
+    swapUses, deleteUses, undoUsed, powerupUsed,
+    durationSoFar: gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0,
+  };
+};
+
+window.applyGameState = function (state) {
+  suppressReset = true;
+  newGame();
+  // Restore grid
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (state.board[r][c]) grid[r][c] = new Tile(r, c, state.board[r][c], false);
+  // Restore state
+  score        = state.score        || 0;
+  moveCount    = state.move_count   || state.moveCount || 0;
+  won          = state.won          || false;
+  keepGoing    = state.keep_going   || state.keepGoing || false;
+  swapUses     = state.swap_uses    ?? state.swapUses    ?? 0;
+  deleteUses   = state.delete_uses  ?? state.deleteUses  ?? 0;
+  undoUsed     = state.undo_used    || state.undoUsed    || false;
+  powerupUsed  = state.powerup_used || state.powerupUsed || false;
+  const dur    = state.duration_so_far ?? state.durationSoFar ?? 0;
+  if (dur > 0) gameStartTime = Date.now() - dur * 1000;
+  scoreEl.textContent = score;
+  updateScoreDisplay(0);
+  updatePowerUpUI();
+};
 
 // ─── Boot ────────────────────────────────────────────────────────
 if (document.readyState === 'loading') {

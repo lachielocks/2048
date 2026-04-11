@@ -47,6 +47,7 @@
     slot.innerHTML = `<button id="auth-sign-in-btn" class="btn btn-auth-pill" aria-label="Sign in"><i data-lucide="log-in"></i> Sign in</button>`;
     document.getElementById('auth-sign-in-btn').addEventListener('click', openAuthModal);
     window.refreshIcons?.();
+    document.dispatchEvent(new CustomEvent('autosave:guest'));
   }
 
   function renderLoggedIn(user) {
@@ -389,8 +390,8 @@
     if (event === 'SIGNED_IN') {
       await checkAdmin(currentUser.id);
       renderLoggedIn(currentUser);
+      document.dispatchEvent(new CustomEvent('autosave:signin', { detail: { user: currentUser } }));
       if (!suppressSignInToast) {
-        // Came from an email link or magic link redirect
         showAuthToast('You\'re signed in — welcome back!');
         cleanUrl();
       }
@@ -417,6 +418,7 @@
     if (event === 'SIGNED_OUT' || !currentUser) {
       localGamesSynced = false;
       renderLoggedOut();
+      document.dispatchEvent(new CustomEvent('autosave:signout'));
       return;
     }
 
@@ -424,6 +426,7 @@
     if (currentUser) {
       await checkAdmin(currentUser.id);
       renderLoggedIn(currentUser);
+      document.dispatchEvent(new CustomEvent('autosave:signin', { detail: { user: currentUser } }));
       if (!localGamesSynced) {
         localGamesSynced = true;
         await window.db.syncLocalGames(currentUser.id);

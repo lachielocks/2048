@@ -111,6 +111,36 @@ async function syncLocalGames(userId) {
   await supabaseClient.from('games').insert(rows);
 }
 
+// ─── Game state autosave ──────────────────────────────────────────
+async function saveGameState(userId, state) {
+  return supabaseClient.from('game_states').upsert({
+    user_id:      userId,
+    board:        state.board,
+    score:        state.score,
+    move_count:   state.moveCount,
+    won:          state.won,
+    keep_going:   state.keepGoing,
+    swap_uses:    state.swapUses,
+    delete_uses:  state.deleteUses,
+    undo_used:    state.undoUsed,
+    powerup_used: state.powerupUsed,
+    duration_so_far: state.durationSoFar,
+    updated_at:   new Date().toISOString(),
+  }, { onConflict: 'user_id' });
+}
+
+async function loadGameState(userId) {
+  return supabaseClient
+    .from('game_states')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+}
+
+async function clearGameState(userId) {
+  return supabaseClient.from('game_states').delete().eq('user_id', userId);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────
 window.db = {
   client: supabaseClient,
@@ -121,4 +151,7 @@ window.db = {
   getUnlockedAchievements,
   saveAchievement,
   syncLocalGames,
+  saveGameState,
+  loadGameState,
+  clearGameState,
 };
