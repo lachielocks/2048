@@ -1,4 +1,4 @@
-/* game.js — 2048 game logic, rendering, input handling */
+/* game.js — 2048 game logic, rendering, input handling, power-ups */
 'use strict';
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -20,6 +20,15 @@ let nextId = 1;
 let prevSnapshot = null; // [[value,...]] of previous board
 let prevScore = 0;
 
+// Power-up uses (reset each new game)
+let swapUses = 0;
+let deleteUses = 0;
+const MAX_USES = 3;
+
+// Active power-up mode
+let activeMode = null; // 'swap' | 'delete' | null
+let swapFirstTile = null;
+
 // ─── DOM refs ────────────────────────────────────────────────────
 const tilesContainer  = document.getElementById('tiles-container');
 const boardCells      = document.getElementById('board-cells');
@@ -27,7 +36,6 @@ const boardEl         = document.getElementById('board');
 const scoreEl         = document.getElementById('score');
 const bestEl          = document.getElementById('best');
 const newGameBtn      = document.getElementById('new-game-btn');
-const undoBtn         = document.getElementById('undo-btn');
 const winOverlay      = document.getElementById('win-overlay');
 const gameoverOverlay = document.getElementById('gameover-overlay');
 const keepGoingBtn    = document.getElementById('keep-going-btn');
@@ -36,6 +44,16 @@ const tryAgainBtn     = document.getElementById('try-again-btn');
 const winScoreEl      = document.getElementById('win-score');
 const gameoverScoreEl = document.getElementById('gameover-score');
 const logoEl          = document.querySelector('.logo');
+
+// Power-up DOM refs
+const undoBtnEl    = document.getElementById('undo-btn');
+const swapBtnEl    = document.getElementById('swap-btn');
+const deleteBtnEl  = document.getElementById('delete-btn');
+const swapBadgeEl  = document.getElementById('swap-badge');
+const deleteBadgeEl= document.getElementById('delete-badge');
+const undoSubEl    = document.getElementById('undo-sub');
+const swapSubEl    = document.getElementById('swap-sub');
+const deleteSubEl  = document.getElementById('delete-sub');
 
 // ─── Cell sizing helper ──────────────────────────────────────────
 function getCellSize() {
@@ -65,7 +83,6 @@ class Tile {
     tilesContainer.appendChild(this.el);
 
     if (isNew) {
-      // Wait one frame so the spawn animation actually plays from scale 0
       requestAnimationFrame(() => {
         this.el.classList.add('tile-new');
         this.el.addEventListener('animationend', () => {
@@ -96,7 +113,7 @@ class Tile {
 
   popMerge() {
     this.el.classList.remove('tile-merge', 'tile-merge-glow', 'tile-merge-halo', 'tile-merge-lightning');
-    void this.el.offsetWidth; // force reflow to restart animation
+    void this.el.offsetWidth;
     this.el.classList.add('tile-merge');
     if (this.value >= 128)  this.el.classList.add('tile-merge-glow');
     if (this.value >= 512)  this.el.classList.add('tile-merge-halo');
@@ -127,6 +144,7 @@ function buildCells() {
 
 // ─── New game ────────────────────────────────────────────────────
 function newGame() {
+  setActiveMode(null);
   tilesContainer.innerHTML = '';
   grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
   score = 0;
@@ -136,9 +154,12 @@ function newGame() {
   isAnimating = false;
   prevSnapshot = null;
   prevScore = 0;
+  swapUses = 0;
+  deleteUses = 0;
 
   scoreEl.textContent = '0';
   hideOverlays();
+  updatePowerUpUI();
 
   spawnTile();
   spawnTile();
@@ -162,22 +183,17 @@ function spawnTile() {
 
 // ─── Move ────────────────────────────────────────────────────────
 function move(dir) {
-  if (isAnimating || isGameOver) return;
+  if (isAnimating || activeMode) return;
+  if (isGameOver) return;
   if (won && !keepGoing) return;
 
-  // Snapshot for undo & "did anything change?" check
   const snapshot = serializeGrid();
   const snapScore = score;
 
-  // Reset merge flags on every tile
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const t = grid[r][c];
-      if (t) {
-        t.merging = false;
-        t.absorbedTile = null;
-        t.newValue = null;
-      }
+      if (t) { t.merging = false; t.absorbedTile = null; t.newValue = null; }
     }
   }
 
@@ -190,7 +206,6 @@ function move(dir) {
     const tile = grid[r][c];
     if (!tile) continue;
 
-    // Walk in direction until we hit edge or another tile
     let nr = r, nc = c;
     while (true) {
       const tr = nr + dr;
@@ -201,36 +216,27 @@ function move(dir) {
       nc = tc;
     }
 
-    // Check the tile we stopped against — can it merge?
     const tr = nr + dr;
     const tc = nc + dc;
     let mergeWith = null;
     if (tr >= 0 && tr < SIZE && tc >= 0 && tc < SIZE) {
       const next = grid[tr][tc];
-      if (next && next.value === tile.value && !next.merging) {
-        mergeWith = next;
-      }
+      if (next && next.value === tile.value && !next.merging) mergeWith = next;
     }
 
     if (mergeWith) {
-      // Slide INTO mergeWith's cell
       grid[r][c] = null;
-      tile.row = tr;
-      tile.col = tc;
+      tile.row = tr; tile.col = tc;
       tile.position();
-
       mergeWith.merging = true;
       mergeWith.absorbedTile = tile;
       mergeWith.newValue = mergeWith.value * 2;
-
       scoreGain += mergeWith.newValue;
       moved = true;
     } else if (nr !== r || nc !== c) {
-      // Just slide
       grid[r][c] = null;
       grid[nr][nc] = tile;
-      tile.row = nr;
-      tile.col = nc;
+      tile.row = nr; tile.col = nc;
       tile.position();
       moved = true;
     }
@@ -238,7 +244,6 @@ function move(dir) {
 
   if (!moved) return;
 
-  // Save undo state
   prevSnapshot = snapshot;
   prevScore = snapScore;
 
@@ -254,28 +259,26 @@ function move(dir) {
 }
 
 function afterSlide() {
-  // Apply merges: swallow absorbed tiles, double the survivors
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const t = grid[r][c];
       if (t && t.merging) {
-        if (t.absorbedTile) {
-          t.absorbedTile.remove();
-          t.absorbedTile = null;
-        }
+        if (t.absorbedTile) { t.absorbedTile.remove(); t.absorbedTile = null; }
         t.setValue(t.newValue);
         t.merging = false;
         t.newValue = null;
         t.popMerge();
 
-        // Confetti for big merges
+        // Award power-up uses
+        if (t.value >= 256) swapUses   = Math.min(MAX_USES, swapUses + 1);
+        if (t.value >= 512) deleteUses = Math.min(MAX_USES, deleteUses + 1);
+
+        // Confetti
         if (t.value >= 512) {
           const rect = t.el.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height / 2;
           const count = t.value >= 2048 ? 150 : t.value >= 1024 ? 80 : 40;
           if (typeof window.triggerConfetti === 'function') {
-            window.triggerConfetti(cx, cy, count);
+            window.triggerConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2, count);
           }
         }
 
@@ -297,6 +300,7 @@ function afterSlide() {
   }
 
   isAnimating = false;
+  updatePowerUpUI();
 }
 
 // ─── Direction helpers ───────────────────────────────────────────
@@ -311,21 +315,16 @@ function directionVector(dir) {
 }
 
 function getTraversal(dir) {
-  // Traverse from the wall outward so the closest tile to the wall moves first
   let rows = [0, 1, 2, 3];
   let cols = [0, 1, 2, 3];
   if (dir === 'right') cols = [3, 2, 1, 0];
   if (dir === 'down')  rows = [3, 2, 1, 0];
   const order = [];
-  for (const r of rows) {
-    for (const c of cols) {
-      order.push([r, c]);
-    }
-  }
+  for (const r of rows) for (const c of cols) order.push([r, c]);
   return order;
 }
 
-// ─── Game over check ─────────────────────────────────────────────
+// ─── Valid moves check ───────────────────────────────────────────
 function hasValidMoves() {
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
@@ -347,15 +346,14 @@ function serializeGrid() {
 function undoMove() {
   if (!prevSnapshot || isAnimating) return;
 
+  setActiveMode(null);
   tilesContainer.innerHTML = '';
   grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
 
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const v = prevSnapshot[r][c];
-      if (v) {
-        grid[r][c] = new Tile(r, c, v, false);
-      }
+      if (v) grid[r][c] = new Tile(r, c, v, false);
     }
   }
 
@@ -363,7 +361,195 @@ function undoMove() {
   scoreEl.textContent = score;
   prevSnapshot = null;
   isGameOver = false;
+  won = false; // revert won flag since board is rolled back
   hideOverlays();
+  updatePowerUpUI();
+}
+
+// ─── Power-up: active mode ───────────────────────────────────────
+function setActiveMode(mode) {
+  // Clean up previous mode
+  if (activeMode === 'swap' && swapFirstTile) {
+    swapFirstTile.el.classList.remove('swap-selected');
+    swapFirstTile = null;
+  }
+  // Clear any delete highlights
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid && grid[r][c]) {
+        grid[r][c].el.classList.remove('will-delete', 'wont-delete', 'swap-selected');
+      }
+    }
+  }
+
+  activeMode = mode;
+  boardEl.classList.remove('mode-swap', 'mode-delete');
+  if (mode) boardEl.classList.add('mode-' + mode);
+
+  swapBtnEl.classList.toggle('active', mode === 'swap');
+  deleteBtnEl.classList.toggle('active', mode === 'delete');
+
+  // Update subtext to reflect mode state
+  if (mode === 'swap') {
+    swapSubEl.textContent = 'Click 1st tile';
+  } else if (swapUses > 0) {
+    swapSubEl.textContent = '';
+  }
+
+  if (mode === 'delete') {
+    deleteSubEl.textContent = 'Click any tile';
+  } else if (deleteUses > 0) {
+    deleteSubEl.textContent = '';
+  }
+}
+
+// ─── Power-up: swap ──────────────────────────────────────────────
+function doSwap(tileA, tileB) {
+  prevSnapshot = serializeGrid();
+  prevScore = score;
+
+  const r1 = tileA.row, c1 = tileA.col;
+  const r2 = tileB.row, c2 = tileB.col;
+
+  grid[r1][c1] = tileB;
+  grid[r2][c2] = tileA;
+  tileA.row = r2; tileA.col = c2;
+  tileB.row = r1; tileB.col = c1;
+
+  tileA.position();
+  tileB.position();
+
+  swapUses--;
+  setActiveMode(null);
+  updatePowerUpUI();
+
+  // If board was game over, re-check after swap
+  if (isGameOver && hasValidMoves()) {
+    isGameOver = false;
+    hideOverlays();
+  }
+}
+
+// ─── Power-up: delete ────────────────────────────────────────────
+function doDelete(value) {
+  prevSnapshot = serializeGrid();
+  prevScore = score;
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const t = grid[r][c];
+      if (t && t.value === value) {
+        grid[r][c] = null;
+        t.el.classList.add('tile-vanish');
+        // Remove element after animation
+        setTimeout(() => t.remove(), 240);
+      }
+    }
+  }
+
+  deleteUses--;
+  setActiveMode(null);
+  updatePowerUpUI();
+
+  if (isGameOver && hasValidMoves()) {
+    isGameOver = false;
+    hideOverlays();
+  }
+}
+
+// ─── Tile click handler (swap / delete modes) ────────────────────
+tilesContainer.addEventListener('click', (e) => {
+  if (!activeMode) return;
+
+  const el = e.target.closest('.tile');
+  if (!el) return;
+
+  // Find the Tile object
+  let clicked = null;
+  outer: for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c] && grid[r][c].el === el) { clicked = grid[r][c]; break outer; }
+    }
+  }
+  if (!clicked) return;
+
+  if (activeMode === 'swap') {
+    if (!swapFirstTile) {
+      swapFirstTile = clicked;
+      clicked.el.classList.add('swap-selected');
+      swapSubEl.textContent = 'Click 2nd tile';
+    } else if (swapFirstTile === clicked) {
+      // Deselect
+      clicked.el.classList.remove('swap-selected');
+      swapFirstTile = null;
+      swapSubEl.textContent = 'Click 1st tile';
+    } else {
+      doSwap(swapFirstTile, clicked);
+    }
+  } else if (activeMode === 'delete') {
+    doDelete(clicked.value);
+  }
+});
+
+// Delete mode: highlight matching tiles on hover
+tilesContainer.addEventListener('mouseover', (e) => {
+  if (activeMode !== 'delete') return;
+  const el = e.target.closest('.tile');
+  if (!el) return;
+  const val = parseInt(el.dataset.value, 10);
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const t = grid[r][c];
+      if (!t) continue;
+      if (t.value === val) { t.el.classList.add('will-delete'); t.el.classList.remove('wont-delete'); }
+      else                 { t.el.classList.add('wont-delete'); t.el.classList.remove('will-delete'); }
+    }
+  }
+});
+
+tilesContainer.addEventListener('mouseout', (e) => {
+  if (activeMode !== 'delete') return;
+  // Only clear when leaving the container itself
+  if (tilesContainer.contains(e.relatedTarget)) return;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c]) grid[r][c].el.classList.remove('will-delete', 'wont-delete');
+    }
+  }
+});
+
+// ─── Power-up UI sync ────────────────────────────────────────────
+function updatePowerUpUI() {
+  // Undo
+  const hasUndo = !!prevSnapshot;
+  undoBtnEl.classList.toggle('unavailable', !hasUndo);
+  undoSubEl.textContent = hasUndo ? 'Last move' : 'No moves yet';
+
+  // Swap
+  if (swapUses > 0) {
+    swapBtnEl.classList.remove('locked');
+    swapBadgeEl.hidden = false;
+    swapBadgeEl.textContent = '×' + swapUses;
+    if (activeMode !== 'swap') swapSubEl.textContent = '';
+  } else {
+    swapBtnEl.classList.add('locked');
+    swapBtnEl.classList.remove('active');
+    swapBadgeEl.hidden = true;
+    swapSubEl.textContent = 'Make a 256';
+  }
+
+  // Delete
+  if (deleteUses > 0) {
+    deleteBtnEl.classList.remove('locked');
+    deleteBadgeEl.hidden = false;
+    deleteBadgeEl.textContent = '×' + deleteUses;
+    if (activeMode !== 'delete') deleteSubEl.textContent = '';
+  } else {
+    deleteBtnEl.classList.add('locked');
+    deleteBtnEl.classList.remove('active');
+    deleteBadgeEl.hidden = true;
+    deleteSubEl.textContent = 'Make a 512';
+  }
 }
 
 // ─── Score ───────────────────────────────────────────────────────
@@ -408,7 +594,7 @@ function pulseLogoOnWin() {
   logoEl.classList.add('win-pulse');
 }
 
-// ─── Resize handling ─────────────────────────────────────────────
+// ─── Resize ──────────────────────────────────────────────────────
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
@@ -423,6 +609,12 @@ window.addEventListener('resize', () => {
 
 // ─── Keyboard ────────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
+  // Escape — cancel active power-up mode
+  if (e.key === 'Escape') {
+    if (activeMode) { e.preventDefault(); setActiveMode(null); }
+    return;
+  }
+
   // Undo: Ctrl+Z / Cmd+Z
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
@@ -438,7 +630,7 @@ window.addEventListener('keydown', (e) => {
     case 'ArrowDown':  case 's': case 'S': dir = 'down';  break;
   }
   if (dir) {
-    e.preventDefault(); // also blocks page scroll on arrows
+    e.preventDefault();
     move(dir);
   }
 }, { passive: false });
@@ -448,6 +640,8 @@ let pStartX = 0, pStartY = 0, pStarted = false;
 const MIN_SWIPE = 30;
 
 boardEl.addEventListener('pointerdown', (e) => {
+  // Don't initiate swipe if a power-up mode is active (tile clicks handle those)
+  if (activeMode) return;
   pStartX = e.clientX;
   pStartY = e.clientY;
   pStarted = true;
@@ -459,21 +653,30 @@ boardEl.addEventListener('pointerup', (e) => {
   const dx = e.clientX - pStartX;
   const dy = e.clientY - pStartY;
   if (Math.max(Math.abs(dx), Math.abs(dy)) < MIN_SWIPE) return;
-  if (Math.abs(dx) > Math.abs(dy)) {
-    move(dx > 0 ? 'right' : 'left');
-  } else {
-    move(dy > 0 ? 'down' : 'up');
-  }
+  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+  else                              move(dy > 0 ? 'down'  : 'up');
 }, { passive: true });
 
 boardEl.addEventListener('pointercancel', () => { pStarted = false; }, { passive: true });
-
-// Block native scroll while interacting with the board
 boardEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
 // ─── Buttons ─────────────────────────────────────────────────────
 newGameBtn.addEventListener('click', newGame);
-undoBtn.addEventListener('click', undoMove);
+
+undoBtnEl.addEventListener('click', undoMove);
+
+swapBtnEl.addEventListener('click', () => {
+  if (swapUses <= 0) return;
+  if (won && !keepGoing) return;
+  setActiveMode(activeMode === 'swap' ? null : 'swap');
+});
+
+deleteBtnEl.addEventListener('click', () => {
+  if (deleteUses <= 0) return;
+  if (won && !keepGoing) return;
+  setActiveMode(activeMode === 'delete' ? null : 'delete');
+});
+
 keepGoingBtn.addEventListener('click', () => {
   keepGoing = true;
   hideOverlays();

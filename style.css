@@ -566,6 +566,164 @@ body {
   line-height: 1.5;
 }
 
+/* ─── Power-ups ──────────────────────────────────────────────── */
+.powerups {
+  display: flex;
+  gap: 8px;
+}
+
+.powerup-btn {
+  flex: 1;
+  position: relative;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 14px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.powerup-btn:hover:not(.locked) {
+  background: #222;
+  border-color: rgba(255,255,255,0.14);
+}
+
+.powerup-btn:active:not(.locked) {
+  transform: scale(0.97);
+}
+
+.powerup-btn.locked {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.powerup-btn.active {
+  background: rgba(255,107,43,0.1);
+  border-color: var(--orange);
+  box-shadow: 0 0 20px rgba(255,107,43,0.25), inset 0 0 12px rgba(255,107,43,0.06);
+}
+
+/* Badge — use counter */
+.powerup-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
+  background: var(--orange);
+  color: #fff;
+  border-radius: 100px;
+  padding: 3px 6px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.powerup-badge[hidden] { display: none; }
+
+/* Icon */
+.powerup-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(255,255,255,0.75);
+  transition: color 160ms ease;
+}
+
+.powerup-btn.active .powerup-icon {
+  color: var(--orange);
+}
+
+/* Label */
+.powerup-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  line-height: 1;
+}
+
+/* Sub-label */
+.powerup-sub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.2;
+  text-align: center;
+  min-height: 12px;
+  transition: color 160ms ease;
+}
+
+.powerup-btn.active .powerup-sub {
+  color: rgba(255,107,43,0.8);
+}
+
+.powerup-btn.unavailable {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ─── Tile interaction (swap / delete modes) ─────────────────── */
+.board.mode-swap .tiles-container,
+.board.mode-delete .tiles-container {
+  pointer-events: auto;
+}
+
+.board.mode-swap .tile,
+.board.mode-delete .tile {
+  cursor: pointer;
+  transition:
+    top var(--transition-slide),
+    left var(--transition-slide),
+    filter 120ms ease,
+    transform 120ms ease,
+    outline 120ms ease;
+}
+
+.board.mode-swap .tile:hover,
+.board.mode-delete .tile:hover {
+  filter: brightness(1.2);
+  transform: scale(1.06);
+  z-index: 20;
+}
+
+/* First-tile selection ring for swap */
+.tile.swap-selected {
+  outline: 3px solid var(--orange);
+  outline-offset: -3px;
+  filter: brightness(1.15);
+  z-index: 20;
+}
+
+/* Delete hover: highlight matching, dim others */
+.tile.will-delete {
+  outline: 3px solid rgba(255,107,43,0.9);
+  outline-offset: -3px;
+  filter: brightness(1.25);
+  z-index: 20;
+}
+
+.tile.wont-delete {
+  filter: brightness(0.45);
+}
+
+/* Tile vanish animation (delete power-up) */
+.tile-vanish {
+  animation: tile-vanish 220ms ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes tile-vanish {
+  0%   { transform: scale(1);   opacity: 1; }
+  60%  { transform: scale(1.1); opacity: 0.6; }
+  100% { transform: scale(0);   opacity: 0; }
+}
+
 /* ─── Responsive adjustments ──────────────────────────────────── */
 @media (max-width: 400px) {
   :root {
