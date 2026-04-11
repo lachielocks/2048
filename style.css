@@ -1181,6 +1181,41 @@ body {
   margin-bottom: 16px;
 }
 
+/* Inline tooltip (used in modal copy) */
+.info-tooltip {
+  position: relative;
+  border-bottom: 1px dashed rgba(255,255,255,0.35);
+  cursor: default;
+}
+
+.info-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #2a2a2a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+  line-height: 1.45;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.info-tooltip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .modal-input--otp {
   font-family: var(--font-title);
   font-size: 22px;
