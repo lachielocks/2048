@@ -20,10 +20,15 @@ let nextId = 1;
 let prevSnapshot = null; // [[value,...]] of previous board
 let prevScore = 0;
 
-// Power-up uses (reset each new game)
+// Power-up uses & progress (reset each new game)
 let swapUses = 0;
 let deleteUses = 0;
+let swapUnlocked = false;
+let deleteUnlocked = false;
+let swapProgress = 0;    // 0.0–1.0, progress toward next use
+let deleteProgress = 0;
 const MAX_USES = 3;
+const PROGRESS_PER_MERGE = 1 / 3; // ~3 qualifying merges = 1 banked use
 
 // Active power-up mode
 let activeMode = null; // 'swap' | 'delete' | null
@@ -61,6 +66,10 @@ const deleteBadgeEl= document.getElementById('delete-badge');
 const undoSubEl    = document.getElementById('undo-sub');
 const swapSubEl    = document.getElementById('swap-sub');
 const deleteSubEl  = document.getElementById('delete-sub');
+
+// Progress bar fill elements (3 per power-up)
+const swapFills   = [0, 1, 2].map(i => document.getElementById('swap-fill-'   + i));
+const deleteFills = [0, 1, 2].map(i => document.getElementById('delete-fill-' + i));
 
 // ─── Cell sizing helper ──────────────────────────────────────────
 function getCellSize() {
@@ -164,6 +173,10 @@ function newGame() {
   prevScore = 0;
   swapUses = 0;
   deleteUses = 0;
+  swapUnlocked = false;
+  deleteUnlocked = false;
+  swapProgress = 0;
+  deleteProgress = 0;
 
   scoreEl.textContent = '0';
   hideOverlays();
@@ -277,9 +290,17 @@ function afterSlide() {
         t.newValue = null;
         t.popMerge();
 
-        // Award power-up uses
-        if (t.value >= 256) swapUses   = Math.min(MAX_USES, swapUses + 1);
-        if (t.value >= 512) deleteUses = Math.min(MAX_USES, deleteUses + 1);
+        // Award power-up progress
+        if (t.value >= 256 && swapUses < MAX_USES) {
+          if (!swapUnlocked) swapUnlocked = true;
+          swapProgress += PROGRESS_PER_MERGE;
+          if (swapProgress >= 1) { swapProgress -= 1; swapUses++; }
+        }
+        if (t.value >= 512 && deleteUses < MAX_USES) {
+          if (!deleteUnlocked) deleteUnlocked = true;
+          deleteProgress += PROGRESS_PER_MERGE;
+          if (deleteProgress >= 1) { deleteProgress -= 1; deleteUses++; }
+        }
 
         // Confetti
         if (t.value >= 512) {
@@ -397,18 +418,10 @@ function setActiveMode(mode) {
   swapBtnEl.classList.toggle('active', mode === 'swap');
   deleteBtnEl.classList.toggle('active', mode === 'delete');
 
-  // Update subtext to reflect mode state
-  if (mode === 'swap') {
-    swapSubEl.textContent = 'Click 1st tile';
-  } else if (swapUses > 0) {
-    swapSubEl.textContent = '';
-  }
-
-  if (mode === 'delete') {
-    deleteSubEl.textContent = 'Click any tile';
-  } else if (deleteUses > 0) {
-    deleteSubEl.textContent = '';
-  }
+  // Set mode-entry instructions; clearing is handled by updatePowerUpUI
+  if (mode === 'swap')   swapSubEl.textContent   = 'Click 1st tile';
+  if (mode === 'delete') deleteSubEl.textContent = 'Click any tile';
+  if (!mode) updatePowerUpUI();
 }
 
 // ─── Power-up: swap ──────────────────────────────────────────────
@@ -429,7 +442,6 @@ function doSwap(tileA, tileB) {
 
   swapUses--;
   setActiveMode(null);
-  updatePowerUpUI();
 
   // If board was game over, re-check after swap
   if (isGameOver && hasValidMoves()) {
@@ -457,7 +469,6 @@ function doDelete(value) {
 
   deleteUses--;
   setActiveMode(null);
-  updatePowerUpUI();
 
   if (isGameOver && hasValidMoves()) {
     isGameOver = false;
@@ -527,6 +538,24 @@ tilesContainer.addEventListener('mouseout', (e) => {
 });
 
 // ─── Power-up UI sync ────────────────────────────────────────────
+function updateBarFills(fills, uses, progress, unlocked) {
+  for (let i = 0; i < MAX_USES; i++) {
+    const fill = fills[i];
+    if (uses > i) {
+      // Fully banked segment
+      fill.style.width = '100%';
+      fill.classList.remove('partial');
+    } else if (uses === i && unlocked && progress > 0) {
+      // Partially filled (progress toward next use)
+      fill.style.width = (progress * 100).toFixed(1) + '%';
+      fill.classList.add('partial');
+    } else {
+      fill.style.width = '0%';
+      fill.classList.remove('partial');
+    }
+  }
+}
+
 function updatePowerUpUI() {
   // Undo
   const hasUndo = !!prevSnapshot;
@@ -534,30 +563,44 @@ function updatePowerUpUI() {
   undoSubEl.textContent = hasUndo ? 'Last move' : 'No moves yet';
 
   // Swap
-  if (swapUses > 0) {
-    swapBtnEl.classList.remove('locked');
+  if (!swapUnlocked) {
+    // Never reached 256 yet
+    swapBtnEl.classList.add('locked');
+    swapBtnEl.classList.remove('active', 'unavailable');
+    swapBadgeEl.hidden = true;
+    if (activeMode !== 'swap') swapSubEl.textContent = 'Reach 256';
+  } else if (swapUses === 0) {
+    // Unlocked but earning toward first use
+    swapBtnEl.classList.remove('locked', 'active');
+    swapBtnEl.classList.add('unavailable');
+    swapBadgeEl.hidden = true;
+    if (activeMode !== 'swap') swapSubEl.textContent = '';
+  } else {
+    swapBtnEl.classList.remove('locked', 'unavailable');
     swapBadgeEl.hidden = false;
     swapBadgeEl.textContent = '×' + swapUses;
     if (activeMode !== 'swap') swapSubEl.textContent = '';
-  } else {
-    swapBtnEl.classList.add('locked');
-    swapBtnEl.classList.remove('active');
-    swapBadgeEl.hidden = true;
-    swapSubEl.textContent = 'Make a 256';
   }
+  updateBarFills(swapFills, swapUses, swapProgress, swapUnlocked);
 
   // Delete
-  if (deleteUses > 0) {
-    deleteBtnEl.classList.remove('locked');
+  if (!deleteUnlocked) {
+    deleteBtnEl.classList.add('locked');
+    deleteBtnEl.classList.remove('active', 'unavailable');
+    deleteBadgeEl.hidden = true;
+    if (activeMode !== 'delete') deleteSubEl.textContent = 'Reach 512';
+  } else if (deleteUses === 0) {
+    deleteBtnEl.classList.remove('locked', 'active');
+    deleteBtnEl.classList.add('unavailable');
+    deleteBadgeEl.hidden = true;
+    if (activeMode !== 'delete') deleteSubEl.textContent = '';
+  } else {
+    deleteBtnEl.classList.remove('locked', 'unavailable');
     deleteBadgeEl.hidden = false;
     deleteBadgeEl.textContent = '×' + deleteUses;
     if (activeMode !== 'delete') deleteSubEl.textContent = '';
-  } else {
-    deleteBtnEl.classList.add('locked');
-    deleteBtnEl.classList.remove('active');
-    deleteBadgeEl.hidden = true;
-    deleteSubEl.textContent = 'Make a 512';
   }
+  updateBarFills(deleteFills, deleteUses, deleteProgress, deleteUnlocked);
 }
 
 // ─── Score ───────────────────────────────────────────────────────

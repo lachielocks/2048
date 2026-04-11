@@ -676,6 +676,34 @@ body {
   cursor: default;
 }
 
+/* ─── Power-up progress bar ──────────────────────────────────── */
+.powerup-bar {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  height: 5px;
+  margin-top: 2px;
+}
+
+.powerup-bar-seg {
+  flex: 1;
+  background: #2a2a2a;
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.powerup-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--orange);
+  border-radius: 100px;
+  transition: width 300ms ease, opacity 300ms ease;
+}
+
+.powerup-bar-fill.partial {
+  opacity: 0.4;
+}
+
 /* ─── Tile interaction (swap / delete modes) ─────────────────── */
 .board.mode-swap .tiles-container,
 .board.mode-delete .tiles-container {
