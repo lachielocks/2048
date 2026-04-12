@@ -180,9 +180,8 @@ function syncBoardSizePicker() {
 function applyBoardSizeChange(n) {
   n = clampBoardSize(n);
   persistPreferredBoardSize(n);
-  setBoardSize(n);
-  newGame();
-  syncBoardSizePicker();
+  localStorage.setItem('skipRestore', '1');
+  location.reload();
 }
 
 function trySelectBoardSize(n) {
@@ -1073,6 +1072,10 @@ window.getGameState = function () {
 
 window.applyGameState = function (state) {
   if (!state || !Array.isArray(state.board) || state.board.length === 0) return;
+  if (localStorage.getItem('skipRestore')) {
+    localStorage.removeItem('skipRestore');
+    return;
+  }
   suppressReset = true;
   const rawBoard = state.board;
   let n = DEFAULT_BOARD_SIZE;
