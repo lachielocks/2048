@@ -1,9 +1,8 @@
 /* solver.js — Expectimax AI solver for 2048 */
-/* Exposes window.getBestMove(board2D) where board2D is a 4×4 array of numbers (0 = empty) */
+/* Exposes window.getBestMove(board2D) where board2D is N×N (0 = empty); N inferred from board.length */
 (function () {
   'use strict';
 
-  var SIZE = 4;
   var DIRS = ['up', 'down', 'left', 'right'];
 
   // ─── Board helpers ────────────────────────────────────────────
@@ -11,23 +10,32 @@
     return board.map(function (row) { return row.slice(); });
   }
 
+  function range(n) {
+    var a = [];
+    for (var i = 0; i < n; i++) a.push(i);
+    return a;
+  }
+
   // Simulate one move. Returns { board, moved }.
   // Mirrors the canonical game.js algorithm exactly.
   function simulateMove(board, dir) {
+    var SIZE = board.length;
     var b = clone(board);
-    var dr, dc, rows, cols;
+    var dr, dc;
+    var rows = range(SIZE);
+    var cols = range(SIZE);
 
     switch (dir) {
-      case 'left':  dr = 0; dc = -1; rows = [0,1,2,3]; cols = [0,1,2,3]; break;
-      case 'right': dr = 0; dc =  1; rows = [0,1,2,3]; cols = [3,2,1,0]; break;
-      case 'up':    dr = -1; dc = 0; rows = [0,1,2,3]; cols = [0,1,2,3]; break;
-      case 'down':  dr =  1; dc = 0; rows = [3,2,1,0]; cols = [0,1,2,3]; break;
+      case 'left':  dr = 0; dc = -1; break;
+      case 'right': dr = 0; dc =  1; cols.reverse(); break;
+      case 'up':    dr = -1; dc = 0; break;
+      case 'down':  dr =  1; dc = 0; rows.reverse(); break;
     }
 
-    // merging flags — parallel array so we don't pollute value
     var merging = [];
-    for (var i = 0; i < SIZE; i++) {
-      merging.push([false, false, false, false]);
+    for (var mi = 0; mi < SIZE; mi++) {
+      merging.push([]);
+      for (var mj = 0; mj < SIZE; mj++) merging[mi].push(false);
     }
 
     var moved = false;
@@ -72,6 +80,7 @@
   }
 
   function scoreBoard(board) {
+    var SIZE = board.length;
     var emptyCells = 0;
     var smoothness = 0;
     var mono = 0;
@@ -131,6 +140,7 @@
 
   // ─── Expectimax ───────────────────────────────────────────────
   function getEmpty(board) {
+    var SIZE = board.length;
     var empties = [];
     for (var r = 0; r < SIZE; r++) {
       for (var c = 0; c < SIZE; c++) {
@@ -197,12 +207,18 @@
   }
 
   // ─── Public API ───────────────────────────────────────────────
-  // board: 4×4 array of numbers (0 = empty)
+  // board: N×N array of numbers (0 = empty)
   // returns: direction string 'up'|'down'|'left'|'right', or null if stuck
   window.getBestMove = function getBestMove(board) {
+    if (!board || !board.length) return null;
+    var N = board.length;
+    if (board.some(function (row) { return !row || row.length !== N; })) return null;
+
     // Choose depth based on number of empty tiles (shallower when board is open)
     var empties = getEmpty(board).length;
     var depth = empties <= 4 ? 5 : empties <= 8 ? 4 : 3;
+    if (N > 4) depth = Math.max(2, depth - 1);
+    if (N > 6) depth = Math.min(depth, 3);
 
     var bestDir = null;
     var bestScore = -Infinity;

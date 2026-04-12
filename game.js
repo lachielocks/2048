@@ -2,11 +2,14 @@
 'use strict';
 
 // ─── Constants ───────────────────────────────────────────────────
-const SIZE = 4;
+const DEFAULT_BOARD_SIZE = 4;
+const MIN_BOARD_SIZE = 4;
+const MAX_BOARD_SIZE = 8;
 const SPAWN_2_PROB = 0.9;
 const SLIDE_MS = 100; // must match CSS --transition-slide
 
 // ─── State ───────────────────────────────────────────────────────
+let SIZE = DEFAULT_BOARD_SIZE; // square edge length (classic 2048 = 4)
 let grid;            // SIZE × SIZE array of Tile or null
 let score = 0;
 let best = 0;
@@ -80,6 +83,21 @@ function getCellSize() {
   return { cell: (w - gap * (SIZE - 1)) / SIZE, gap };
 }
 
+function clampBoardSize(n) {
+  const x = parseInt(n, 10);
+  if (!Number.isFinite(x)) return DEFAULT_BOARD_SIZE;
+  return Math.max(MIN_BOARD_SIZE, Math.min(MAX_BOARD_SIZE, x));
+}
+
+/** Sets grid edge length and rebuilds empty cell divs. Default play remains 4×4. */
+function setBoardSize(n) {
+  const next = clampBoardSize(n);
+  if (next === SIZE && boardCells.children.length === next * next) return;
+  SIZE = next;
+  boardEl.style.setProperty('--grid-size', String(SIZE));
+  buildCells();
+}
+
 // ─── Tile class ──────────────────────────────────────────────────
 class Tile {
   constructor(row, col, value, isNew = true) {
@@ -146,7 +164,7 @@ class Tile {
 function init() {
   best = parseInt(localStorage.getItem('best2048') || '0', 10);
   bestEl.textContent = best;
-  buildCells();
+  setBoardSize(DEFAULT_BOARD_SIZE);
   newGame();
   setupFooterCrossPromo();
 }
@@ -197,9 +215,12 @@ function newGame() {
     localStorage.removeItem('demo_board');
     try {
       const demo = JSON.parse(demoRaw);
+      const b = demo.board;
+      if (!Array.isArray(b) || b.length !== SIZE || b.some(row => !Array.isArray(row) || row.length !== SIZE))
+        throw new Error('demo size mismatch');
       for (let r = 0; r < SIZE; r++)
         for (let c = 0; c < SIZE; c++)
-          if (demo.board[r][c]) grid[r][c] = new Tile(r, c, demo.board[r][c], false);
+          if (b[r][c]) grid[r][c] = new Tile(r, c, b[r][c], false);
       if (demo.score) { score = demo.score; scoreEl.textContent = score; updateScoreDisplay(0); }
       if (demo.won)   { won = true; }
       isUntrackedGame = true; // demo games don't count
@@ -384,10 +405,11 @@ function directionVector(dir) {
 }
 
 function getTraversal(dir) {
-  let rows = [0, 1, 2, 3];
-  let cols = [0, 1, 2, 3];
-  if (dir === 'right') cols = [3, 2, 1, 0];
-  if (dir === 'down')  rows = [3, 2, 1, 0];
+  const idx = Array.from({ length: SIZE }, (_, i) => i);
+  let rows = idx.slice();
+  let cols = idx.slice();
+  if (dir === 'right') cols.reverse();
+  if (dir === 'down') rows.reverse();
   const order = [];
   for (const r of rows) for (const c of cols) order.push([r, c]);
   return order;
@@ -657,7 +679,7 @@ function dispatchGameEnd(isWon) {
   document.dispatchEvent(new CustomEvent('game:end', { detail: {
     score, highestTile, moves: moveCount,
     durationSeconds, won: isWon, boardState,
-    undoUsed, powerupUsed, mode: 'classic',
+    undoUsed, powerupUsed, mode: 'classic', boardSize: SIZE,
   }}));
 
   // Persist to localStorage for guest sync later
@@ -863,19 +885,37 @@ window.getGameState = function () {
     for (let c = 0; c < SIZE; c++) board[r].push(grid[r][c] ? grid[r][c].value : 0);
   }
   return {
-    board, score, moveCount, won, keepGoing,
+    board, boardSize: SIZE, score, moveCount, won, keepGoing,
     swapUses, deleteUses, undoUsed, powerupUsed,
     durationSoFar: gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0,
   };
 };
 
 window.applyGameState = function (state) {
+  if (!state || !Array.isArray(state.board) || state.board.length === 0) return;
   suppressReset = true;
+  const rawBoard = state.board;
+  let n = DEFAULT_BOARD_SIZE;
+  if (rawBoard.every(row => Array.isArray(row) && row.length === rawBoard.length))
+    n = clampBoardSize(rawBoard.length);
+  else if (state.board_size != null) n = clampBoardSize(state.board_size);
+  else if (state.boardSize != null) n = clampBoardSize(state.boardSize);
+  setBoardSize(n);
   newGame();
-  // Restore grid
-  for (let r = 0; r < SIZE; r++)
-    for (let c = 0; c < SIZE; c++)
-      if (state.board[r][c]) grid[r][c] = new Tile(r, c, state.board[r][c], false);
+  // Drop random spawns; rebuild exactly from saved board
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const t = grid[r][c];
+      if (t) t.remove();
+      grid[r][c] = null;
+    }
+  }
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const v = rawBoard[r]?.[c];
+      if (v) grid[r][c] = new Tile(r, c, v, false);
+    }
+  }
   // Restore state
   score        = state.score        || 0;
   moveCount    = state.move_count   || state.moveCount || 0;

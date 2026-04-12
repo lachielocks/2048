@@ -284,8 +284,8 @@ body {
   position: absolute;
   inset: var(--gap);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 1fr);
+  grid-template-columns: repeat(var(--grid-size, 4), 1fr);
+  grid-template-rows: repeat(var(--grid-size, 4), 1fr);
   gap: var(--gap);
 }
 
