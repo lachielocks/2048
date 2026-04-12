@@ -1,7 +1,7 @@
 /* sw.js — Service worker for offline caching */
 'use strict';
 
-const CACHE_NAME = '2048-v6';
+const CACHE_NAME = '2048-v8';
 
 const STATIC_ASSETS = [
   '/',

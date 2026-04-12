@@ -47,23 +47,23 @@
         <div class="buttons">
           <div id="auth-header-slot"></div>
           <button class="btn" id="ai-btn" aria-label="Watch AI play"><i data-lucide="bot"></i> Watch AI</button>
+          <div class="board-size-dropdown" id="board-size-dropdown">
+            <button type="button" class="btn board-size-dropdown__trigger" id="board-size-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Board size">
+              <span id="board-size-trigger-label">4×4</span>
+              <i data-lucide="chevron-down" class="board-size-dropdown__chev" aria-hidden="true"></i>
+            </button>
+            <ul class="board-size-dropdown__menu" id="board-size-menu" role="listbox" aria-labelledby="board-size-trigger" hidden>
+              <li role="option" class="board-size-dropdown__item" data-size="4" tabindex="-1">4×4 — Classic</li>
+              <li role="option" class="board-size-dropdown__item" data-size="5" tabindex="-1">5×5</li>
+              <li role="option" class="board-size-dropdown__item" data-size="6" tabindex="-1">6×6</li>
+              <li role="option" class="board-size-dropdown__item" data-size="7" tabindex="-1">7×7</li>
+              <li role="option" class="board-size-dropdown__item" data-size="8" tabindex="-1">8×8</li>
+            </ul>
+          </div>
           <button class="btn" id="new-game-btn" aria-label="New Game"><i data-lucide="rotate-ccw"></i> New Game</button>
         </div>
       </div>
     </header>
-
-    <div class="board-size-bar">
-      <label class="board-size-bar-label" for="board-size-select">Board size</label>
-      <div class="board-size-select-wrap">
-        <select id="board-size-select" class="board-size-select">
-          <option value="4">4×4 — Classic</option>
-          <option value="5">5×5</option>
-          <option value="6">6×6</option>
-          <option value="7">7×7</option>
-          <option value="8">8×8</option>
-        </select>
-      </div>
-    </div>
 
     <div class="game-area">
       <section class="powerups" aria-label="Power-ups">

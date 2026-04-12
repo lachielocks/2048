@@ -80,7 +80,10 @@ const deleteSubEl  = document.getElementById('delete-sub');
 const swapFills   = [0, 1, 2].map(i => document.getElementById('swap-fill-'   + i));
 const deleteFills = [0, 1, 2].map(i => document.getElementById('delete-fill-' + i));
 
-const boardSizeSelect       = document.getElementById('board-size-select');
+const boardSizeDropdown     = document.getElementById('board-size-dropdown');
+const boardSizeTrigger      = document.getElementById('board-size-trigger');
+const boardSizeTriggerLabel = document.getElementById('board-size-trigger-label');
+const boardSizeMenu         = document.getElementById('board-size-menu');
 const boardSizeModal        = document.getElementById('board-size-modal');
 const boardSizeModalText    = document.getElementById('board-size-modal-text');
 const boardSizeModalCancel  = document.getElementById('board-size-modal-cancel');
@@ -88,8 +91,9 @@ const boardSizeModalConfirm = document.getElementById('board-size-modal-confirm'
 
 // ─── Cell sizing helper ──────────────────────────────────────────
 function getCellSize() {
-  const w = tilesContainer.clientWidth;
+  const w = boardCells.clientWidth || tilesContainer.clientWidth;
   const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
+  if (!SIZE) return { cell: 0, gap };
   return { cell: (w - gap * (SIZE - 1)) / SIZE, gap };
 }
 
@@ -99,9 +103,9 @@ function clampBoardSize(n) {
   return Math.max(MIN_BOARD_SIZE, Math.min(MAX_BOARD_SIZE, x));
 }
 
-/** Apply N×N grid tracks (repeat(var(), 1fr) is broken in some browsers). */
+/** Apply N×N grid tracks (repeat(var(), 1fr) is unreliable; minmax avoids flex blowout). */
 function syncBoardGridLayout() {
-  const track = `repeat(${SIZE}, 1fr)`;
+  const track = `repeat(${SIZE}, minmax(0, 1fr))`;
   boardCells.style.gridTemplateColumns = track;
   boardCells.style.gridTemplateRows = track;
   tilesContainer.style.gridTemplateColumns = track;
@@ -118,7 +122,11 @@ function repositionAllTiles() {
 }
 
 function scheduleTileLayoutFix() {
-  requestAnimationFrame(() => repositionAllTiles());
+  requestAnimationFrame(() => {
+    syncBoardGridLayout();
+    repositionAllTiles();
+    requestAnimationFrame(() => repositionAllTiles());
+  });
 }
 
 /** Sets grid edge length and rebuilds empty cell divs. Default play remains 4×4. */
@@ -149,9 +157,28 @@ function isGameInProgress() {
   return moveCount > 0 || score > 0;
 }
 
+function setBoardSizeMenuOpen(open) {
+  if (!boardSizeMenu || !boardSizeTrigger) return;
+  boardSizeMenu.hidden = !open;
+  boardSizeTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  boardSizeTrigger.classList.toggle('board-size-dropdown__trigger--open', open);
+  if (open) window.refreshIcons?.();
+}
+
+function closeBoardSizeMenu() {
+  if (!boardSizeMenu || boardSizeMenu.hidden) return;
+  setBoardSizeMenuOpen(false);
+}
+
 function syncBoardSizePicker() {
-  if (!boardSizeSelect) return;
-  boardSizeSelect.value = String(SIZE);
+  if (boardSizeTriggerLabel) {
+    boardSizeTriggerLabel.textContent = SIZE === 4 ? '4×4' : `${SIZE}×${SIZE}`;
+  }
+  boardSizeMenu?.querySelectorAll('.board-size-dropdown__item').forEach((el) => {
+    const n = clampBoardSize(el.dataset.size);
+    el.setAttribute('aria-selected', n === SIZE ? 'true' : 'false');
+    el.classList.toggle('board-size-dropdown__item--current', n === SIZE);
+  });
 }
 
 function applyBoardSizeChange(n) {
@@ -165,6 +192,7 @@ function applyBoardSizeChange(n) {
 function trySelectBoardSize(n) {
   n = clampBoardSize(n);
   if (n === SIZE) return;
+  closeBoardSizeMenu();
   if (isGameInProgress()) {
     pendingBoardSize = n;
     if (boardSizeModalText) {
@@ -181,15 +209,24 @@ function trySelectBoardSize(n) {
 }
 
 function initBoardSizePicker() {
-  boardSizeSelect?.addEventListener('change', () => {
-    const n = clampBoardSize(boardSizeSelect.value);
-    if (n === SIZE) return;
-    if (isGameInProgress()) {
-      boardSizeSelect.value = String(SIZE);
-      trySelectBoardSize(n);
-      return;
-    }
+  boardSizeTrigger?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBoardSizeMenuOpen(!!boardSizeMenu?.hidden);
+  });
+
+  boardSizeMenu?.addEventListener('click', (e) => {
+    const item = e.target.closest('.board-size-dropdown__item');
+    if (!item) return;
+    const n = clampBoardSize(item.dataset.size);
+    setBoardSizeMenuOpen(false);
     trySelectBoardSize(n);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!boardSizeMenu || boardSizeMenu.hidden) return;
+    if (boardSizeDropdown?.contains(e.target)) return;
+    setBoardSizeMenuOpen(false);
   });
 
   boardSizeModalCancel?.addEventListener('click', () => {
@@ -384,7 +421,9 @@ function spawnTile() {
 
 // ─── Move ────────────────────────────────────────────────────────
 function move(dir) {
+  closeBoardSizeMenu();
   if (boardSizeModal && !boardSizeModal.hidden) return;
+  syncBoardGridLayout();
   if (isAnimating || activeMode) return;
   if (isGameOver) return;
   if (won && !keepGoing) return;
@@ -864,6 +903,7 @@ let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
+    syncBoardGridLayout();
     for (let r = 0; r < SIZE; r++) {
       for (let c = 0; c < SIZE; c++) {
         if (grid && grid[r][c]) grid[r][c].position();
@@ -874,8 +914,13 @@ window.addEventListener('resize', () => {
 
 // ─── Keyboard ────────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
-  // Escape — board size modal, then power-up mode
+  // Escape — board size menu, modal, then power-up mode
   if (e.key === 'Escape') {
+    if (boardSizeMenu && !boardSizeMenu.hidden) {
+      e.preventDefault();
+      setBoardSizeMenuOpen(false);
+      return;
+    }
     if (boardSizeModal && !boardSizeModal.hidden) {
       e.preventDefault();
       pendingBoardSize = null;
@@ -918,6 +963,7 @@ let pStartX = 0, pStartY = 0, pStarted = false;
 const MIN_SWIPE = 30;
 
 boardEl.addEventListener('pointerdown', (e) => {
+  closeBoardSizeMenu();
   if (boardSizeModal && !boardSizeModal.hidden) return;
   // Don't initiate swipe if a power-up mode is active or AI is running
   if (activeMode || isAutoplay) return;
