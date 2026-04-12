@@ -5,6 +5,7 @@
 const DEFAULT_BOARD_SIZE = 4;
 const MIN_BOARD_SIZE = 4;
 const MAX_BOARD_SIZE = 8;
+const PREFERRED_SIZE_KEY = 'preferredBoardSize';
 const SPAWN_2_PROB = 0.9;
 const SLIDE_MS = 100; // must match CSS --transition-slide
 
@@ -38,6 +39,9 @@ let autoplayTimer = null;
 
 // Set true for AI or demo games — skips best-score update + game:end event
 let isUntrackedGame = false;
+
+// Board size UI (confirm before abandoning a game)
+let pendingBoardSize = null;
 
 // Game tracking (for saving + achievements)
 let moveCount = 0;
@@ -76,6 +80,12 @@ const deleteSubEl  = document.getElementById('delete-sub');
 const swapFills   = [0, 1, 2].map(i => document.getElementById('swap-fill-'   + i));
 const deleteFills = [0, 1, 2].map(i => document.getElementById('delete-fill-' + i));
 
+const boardSizePicker       = document.getElementById('board-size-picker');
+const boardSizeModal        = document.getElementById('board-size-modal');
+const boardSizeModalText    = document.getElementById('board-size-modal-text');
+const boardSizeModalCancel  = document.getElementById('board-size-modal-cancel');
+const boardSizeModalConfirm = document.getElementById('board-size-modal-confirm');
+
 // ─── Cell sizing helper ──────────────────────────────────────────
 function getCellSize() {
   const w = tilesContainer.clientWidth;
@@ -92,10 +102,92 @@ function clampBoardSize(n) {
 /** Sets grid edge length and rebuilds empty cell divs. Default play remains 4×4. */
 function setBoardSize(n) {
   const next = clampBoardSize(n);
-  if (next === SIZE && boardCells.children.length === next * next) return;
+  if (next === SIZE && boardCells.children.length === next * next) {
+    boardEl.dataset.size = String(SIZE);
+    boardEl.setAttribute('aria-label', `${SIZE} by ${SIZE} game board`);
+    return;
+  }
   SIZE = next;
   boardEl.style.setProperty('--grid-size', String(SIZE));
+  boardEl.dataset.size = String(SIZE);
+  boardEl.setAttribute('aria-label', `${SIZE} by ${SIZE} game board`);
   buildCells();
+}
+
+function readPreferredBoardSize() {
+  return clampBoardSize(localStorage.getItem(PREFERRED_SIZE_KEY));
+}
+
+function persistPreferredBoardSize(n) {
+  localStorage.setItem(PREFERRED_SIZE_KEY, String(clampBoardSize(n)));
+}
+
+function isGameInProgress() {
+  return moveCount > 0 || score > 0;
+}
+
+function syncBoardSizePicker() {
+  if (!boardSizePicker) return;
+  boardSizePicker.querySelectorAll('.board-size-opt').forEach((btn) => {
+    const n = clampBoardSize(btn.dataset.size);
+    btn.setAttribute('aria-pressed', n === SIZE ? 'true' : 'false');
+  });
+}
+
+function applyBoardSizeChange(n) {
+  n = clampBoardSize(n);
+  persistPreferredBoardSize(n);
+  setBoardSize(n);
+  newGame();
+  syncBoardSizePicker();
+}
+
+function trySelectBoardSize(n) {
+  n = clampBoardSize(n);
+  if (n === SIZE) return;
+  if (isGameInProgress()) {
+    pendingBoardSize = n;
+    if (boardSizeModalText) {
+      boardSizeModalText.textContent =
+        `Switch to ${n}×${n}? Your current game will be replaced with a new board.`;
+    }
+    if (boardSizeModal) {
+      boardSizeModal.hidden = false;
+      boardSizeModalConfirm?.focus();
+    }
+    return;
+  }
+  applyBoardSizeChange(n);
+}
+
+function initBoardSizePicker() {
+  if (!boardSizePicker) return;
+  boardSizePicker.addEventListener('click', (e) => {
+    const btn = e.target.closest('.board-size-opt');
+    if (!btn) return;
+    trySelectBoardSize(btn.dataset.size);
+  });
+
+  boardSizeModalCancel?.addEventListener('click', () => {
+    pendingBoardSize = null;
+    if (boardSizeModal) boardSizeModal.hidden = true;
+    syncBoardSizePicker();
+  });
+
+  boardSizeModalConfirm?.addEventListener('click', () => {
+    const next = pendingBoardSize;
+    pendingBoardSize = null;
+    if (boardSizeModal) boardSizeModal.hidden = true;
+    if (next != null) applyBoardSizeChange(next);
+  });
+
+  boardSizeModal?.addEventListener('click', (e) => {
+    if (e.target === boardSizeModal) {
+      pendingBoardSize = null;
+      boardSizeModal.hidden = true;
+      syncBoardSizePicker();
+    }
+  });
 }
 
 // ─── Tile class ──────────────────────────────────────────────────
@@ -164,8 +256,10 @@ class Tile {
 function init() {
   best = parseInt(localStorage.getItem('best2048') || '0', 10);
   bestEl.textContent = best;
-  setBoardSize(DEFAULT_BOARD_SIZE);
+  setBoardSize(readPreferredBoardSize());
+  initBoardSizePicker();
   newGame();
+  syncBoardSizePicker();
   setupFooterCrossPromo();
 }
 
@@ -187,6 +281,24 @@ function newGame() {
   suppressReset = false;
   stopAutoplay();
   setActiveMode(null);
+
+  let demoPayload = null;
+  const demoRaw = localStorage.getItem('demo_board');
+  if (demoRaw) {
+    try {
+      const demo = JSON.parse(demoRaw);
+      const b = demo.board;
+      if (Array.isArray(b) && b.length > 0 &&
+          b.every(row => Array.isArray(row) && row.length === b.length)) {
+        const n = clampBoardSize(b.length);
+        setBoardSize(n);
+        persistPreferredBoardSize(n);
+        demoPayload = demo;
+      }
+    } catch {}
+    localStorage.removeItem('demo_board');
+  }
+
   tilesContainer.innerHTML = '';
   grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
   score = 0;
@@ -209,23 +321,19 @@ function newGame() {
   updatePowerUpUI();
   document.dispatchEvent(new CustomEvent('game:new'));
 
-  // Check for a demo board injected by the admin panel
-  const demoRaw = localStorage.getItem('demo_board');
-  if (demoRaw) {
-    localStorage.removeItem('demo_board');
-    try {
-      const demo = JSON.parse(demoRaw);
-      const b = demo.board;
-      if (!Array.isArray(b) || b.length !== SIZE || b.some(row => !Array.isArray(row) || row.length !== SIZE))
-        throw new Error('demo size mismatch');
+  if (demoPayload) {
+    const b = demoPayload.board;
+    if (Array.isArray(b) && b.length === SIZE &&
+        b.every(row => Array.isArray(row) && row.length === SIZE)) {
       for (let r = 0; r < SIZE; r++)
         for (let c = 0; c < SIZE; c++)
           if (b[r][c]) grid[r][c] = new Tile(r, c, b[r][c], false);
-      if (demo.score) { score = demo.score; scoreEl.textContent = score; updateScoreDisplay(0); }
-      if (demo.won)   { won = true; }
-      isUntrackedGame = true; // demo games don't count
+      if (demoPayload.score) { score = demoPayload.score; scoreEl.textContent = score; updateScoreDisplay(0); }
+      if (demoPayload.won) { won = true; }
+      isUntrackedGame = true;
+      syncBoardSizePicker();
       return;
-    } catch {}
+    }
   }
 
   spawnTile();
@@ -250,6 +358,7 @@ function spawnTile() {
 
 // ─── Move ────────────────────────────────────────────────────────
 function move(dir) {
+  if (boardSizeModal && !boardSizeModal.hidden) return;
   if (isAnimating || activeMode) return;
   if (isGameOver) return;
   if (won && !keepGoing) return;
@@ -685,7 +794,10 @@ function dispatchGameEnd(isWon) {
   // Persist to localStorage for guest sync later
   try {
     const games = JSON.parse(localStorage.getItem('games2048') || '[]');
-    games.push({ score, highestTile, moves: moveCount, durationSeconds, won: isWon, mode: 'classic', boardState, createdAt: Date.now() });
+    games.push({
+      score, highestTile, moves: moveCount, durationSeconds, won: isWon, mode: 'classic',
+      boardSize: SIZE, boardState, createdAt: Date.now(),
+    });
     if (games.length > 10) games.splice(0, games.length - 10);
     localStorage.setItem('games2048', JSON.stringify(games));
   } catch {}
@@ -736,8 +848,15 @@ window.addEventListener('resize', () => {
 
 // ─── Keyboard ────────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
-  // Escape — cancel active power-up mode
+  // Escape — board size modal, then power-up mode
   if (e.key === 'Escape') {
+    if (boardSizeModal && !boardSizeModal.hidden) {
+      e.preventDefault();
+      pendingBoardSize = null;
+      boardSizeModal.hidden = true;
+      syncBoardSizePicker();
+      return;
+    }
     if (activeMode) { e.preventDefault(); setActiveMode(null); }
     return;
   }
@@ -773,6 +892,7 @@ let pStartX = 0, pStartY = 0, pStarted = false;
 const MIN_SWIPE = 30;
 
 boardEl.addEventListener('pointerdown', (e) => {
+  if (boardSizeModal && !boardSizeModal.hidden) return;
   // Don't initiate swipe if a power-up mode is active or AI is running
   if (activeMode || isAutoplay) return;
   pStartX = e.clientX;
@@ -930,6 +1050,8 @@ window.applyGameState = function (state) {
   scoreEl.textContent = score;
   updateScoreDisplay(0);
   updatePowerUpUI();
+  persistPreferredBoardSize(SIZE);
+  syncBoardSizePicker();
 };
 
 // ─── Boot ────────────────────────────────────────────────────────

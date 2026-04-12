@@ -264,6 +264,17 @@ body {
   width: 100%;
 }
 
+.board[data-size="5"] .tile {
+  font-size: clamp(14px, 4.8vw, 40px);
+}
+.board[data-size="6"] .tile {
+  font-size: clamp(12px, 4vw, 36px);
+}
+.board[data-size="7"] .tile,
+.board[data-size="8"] .tile {
+  font-size: clamp(9px, 2.9vw, 28px);
+}
+
 .board {
   position: relative;
   background: var(--board-bg);
@@ -584,6 +595,113 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* ─── Board size picker ───────────────────────────────────────── */
+.board-size-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  background: #141414;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+}
+
+.board-size-bar-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.board-size-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.board-size-opt {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 100px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: #1e1e1e;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.board-size-opt:hover {
+  background: #252525;
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.board-size-opt[aria-pressed="true"] {
+  background: var(--orange);
+  color: #fff;
+  border-color: var(--orange);
+  box-shadow: 0 0 14px rgba(255,107,43,0.35);
+}
+
+.board-size-opt:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255,107,43,0.35);
+}
+
+.modal-card--narrow {
+  max-width: 360px;
+}
+
+.modal-title--inline {
+  margin-bottom: 10px;
+  padding-right: 0;
+  font-size: 20px;
+}
+
+.modal-lede {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+
+.modal-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-inline-actions .btn {
+  flex: 1 1 auto;
+  min-width: 100px;
+  justify-content: center;
+}
+
+@media (max-width: 400px) {
+  .board-size-options {
+    width: 100%;
+  }
+
+  .board-size-opt {
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: 0;
+    text-align: center;
+    padding: 8px 6px;
+  }
 }
 
 /* ─── Game area (board + powerups wrapper) ───────────────────── */

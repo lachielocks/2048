@@ -52,6 +52,17 @@
       </div>
     </header>
 
+    <div class="board-size-bar" role="group" aria-label="Board size">
+      <span class="board-size-bar-label">Board size</span>
+      <div class="board-size-options" id="board-size-picker">
+        <button type="button" class="board-size-opt" data-size="4" aria-pressed="true">4×4</button>
+        <button type="button" class="board-size-opt" data-size="5">5×5</button>
+        <button type="button" class="board-size-opt" data-size="6">6×6</button>
+        <button type="button" class="board-size-opt" data-size="7">7×7</button>
+        <button type="button" class="board-size-opt" data-size="8">8×8</button>
+      </div>
+    </div>
+
     <div class="game-area">
       <section class="powerups" aria-label="Power-ups">
         <!-- Undo -->
@@ -87,7 +98,7 @@
       </section>
 
       <main class="game-container">
-        <div class="board" id="board" role="grid" aria-label="2048 game board">
+        <div class="board" id="board" role="grid" aria-label="Game board">
           <div class="board-cells" id="board-cells" aria-hidden="true"></div>
           <div class="tiles-container" id="tiles-container"></div>
         </div>
@@ -134,6 +145,18 @@
       </p>
       <p class="footer-cross-promo" id="footer-cross-promo"></p>
     </footer>
+  </div>
+
+  <!-- ─── Board size change (abandon game) ───────────────────────── -->
+  <div id="board-size-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="board-size-modal-title">
+    <div class="modal-card modal-card--narrow">
+      <h2 id="board-size-modal-title" class="modal-title modal-title--inline">Change board size?</h2>
+      <p class="modal-lede" id="board-size-modal-text">Starting a new game on the selected board will end your current progress.</p>
+      <div class="modal-inline-actions">
+        <button type="button" class="btn btn-secondary" id="board-size-modal-cancel">Cancel</button>
+        <button type="button" class="btn" id="board-size-modal-confirm">New game</button>
+      </div>
+    </div>
   </div>
 
   <!-- ─── Auth Modal ─────────────────────────────────────────────── -->
