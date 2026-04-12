@@ -77,7 +77,7 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   flex-wrap: wrap;
 }
 
@@ -146,9 +146,7 @@ body {
 
 .header-right {
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
 }
 
 /* ─── Score boxes ──────────────────────────────────────────────── */
@@ -214,11 +212,17 @@ body {
 }
 
 /* ─── Buttons ──────────────────────────────────────────────────── */
+#auth-header-slot:empty {
+  display: none;
+}
+
 .buttons {
   display: flex;
   flex-wrap: wrap;
+  flex-basis: 100%;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .btn {
