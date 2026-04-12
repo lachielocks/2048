@@ -9,7 +9,7 @@ alwaysApply: true
 
 - The app must **always** ship with a **plain, original classic 2048**: **4×4 grid**, standard merge rules, no alternate topology as the default.
 - **First load**, **New Game**, and any **reset to defaults** must use this classic board unless the player has explicitly chosen another layout in-session or via a saved preference.
-- **Board size** is chosen in the header bar (4×4–8×8). **4×4 remains the classic default** for new visitors; the chosen size is remembered in `localStorage` (`preferredBoardSize`). Hex or other topologies are still separate from this control.
+- **Board size** is a custom pill dropdown in the header next to **New Game** (4×4–8×8). **4×4 remains the classic default** for new visitors; preference in `localStorage` (`preferredBoardSize`). Hex or other topologies stay separate.
 
 ## Stack and layout
 
