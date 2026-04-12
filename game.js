@@ -91,9 +91,24 @@ const boardSizeModalConfirm = document.getElementById('board-size-modal-confirm'
 
 // ─── Cell sizing helper ──────────────────────────────────────────
 function getCellSize() {
+  if (!SIZE) return { cell: 0, gap: 10 };
+
+  void boardCells.offsetWidth;
+
+  const cellEl = boardCells.querySelector('.cell');
+  if (cellEl) {
+    const rect = cellEl.getBoundingClientRect();
+    const cs = getComputedStyle(boardCells);
+    const gapRaw = cs.columnGap || cs.rowGap || cs.gap || '';
+    const gap = parseFloat(gapRaw) || parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
+    if (rect.width > 0.5 && rect.height > 0.5) {
+      const cell = Math.min(rect.width, rect.height);
+      return { cell, gap };
+    }
+  }
+
   const w = boardCells.clientWidth || tilesContainer.clientWidth;
   const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
-  if (!SIZE) return { cell: 0, gap };
   return { cell: (w - gap * (SIZE - 1)) / SIZE, gap };
 }
 
@@ -268,8 +283,8 @@ class Tile {
     this.el.className = 'tile';
     this.el.dataset.value = value;
     this.el.textContent = value;
-    this.position();
     tilesContainer.appendChild(this.el);
+    this.position();
 
     if (isNew) {
       requestAnimationFrame(() => {
@@ -319,9 +334,25 @@ function init() {
   bestEl.textContent = best;
   setBoardSize(readPreferredBoardSize());
   initBoardSizePicker();
+  setupBoardLayoutObserver();
   newGame();
   syncBoardSizePicker();
   setupFooterCrossPromo();
+}
+
+function setupBoardLayoutObserver() {
+  if (typeof ResizeObserver === 'undefined') return;
+  let roScheduled = false;
+  const ro = new ResizeObserver(() => {
+    if (roScheduled) return;
+    roScheduled = true;
+    requestAnimationFrame(() => {
+      roScheduled = false;
+      syncBoardGridLayout();
+      repositionAllTiles();
+    });
+  });
+  ro.observe(boardCells);
 }
 
 function buildCells() {
