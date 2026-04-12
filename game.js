@@ -126,7 +126,9 @@ function repositionAllTiles() {
 }
 
 function scheduleTileLayoutFix() {
-  requestAnimationFrame(() => repositionAllTiles());
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => repositionAllTiles());
+  });
 }
 
 /** Sets grid edge length, rebuilds cells, and syncs grid tracks. Always rebuilds if size changes. */
