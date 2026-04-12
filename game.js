@@ -90,26 +90,15 @@ const boardSizeModalCancel  = document.getElementById('board-size-modal-cancel')
 const boardSizeModalConfirm = document.getElementById('board-size-modal-confirm');
 
 // ─── Cell sizing helper ──────────────────────────────────────────
+// Compute from the board element's actual rendered width — no dependency on grid layout timing.
 function getCellSize() {
   if (!SIZE) return { cell: 0, gap: 10 };
-
-  void boardCells.offsetWidth;
-
-  const cellEl = boardCells.querySelector('.cell');
-  if (cellEl) {
-    const rect = cellEl.getBoundingClientRect();
-    const cs = getComputedStyle(boardCells);
-    const gapRaw = cs.columnGap || cs.rowGap || cs.gap || '';
-    const gap = parseFloat(gapRaw) || parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
-    if (rect.width > 0.5 && rect.height > 0.5) {
-      const cell = Math.min(rect.width, rect.height);
-      return { cell, gap };
-    }
-  }
-
-  const w = boardCells.clientWidth || tilesContainer.clientWidth;
   const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
-  return { cell: (w - gap * (SIZE - 1)) / SIZE, gap };
+  // .board has box-sizing: border-box + padding: var(--gap)
+  // .tiles-container is absolute with inset: var(--gap), so its width = board.offsetWidth - 2*gap
+  const containerWidth = boardEl.offsetWidth - 2 * gap;
+  const cell = (containerWidth - gap * (SIZE - 1)) / SIZE;
+  return { cell: Math.max(cell, 0), gap };
 }
 
 function clampBoardSize(n) {
@@ -137,22 +126,12 @@ function repositionAllTiles() {
 }
 
 function scheduleTileLayoutFix() {
-  requestAnimationFrame(() => {
-    syncBoardGridLayout();
-    repositionAllTiles();
-    requestAnimationFrame(() => repositionAllTiles());
-  });
+  requestAnimationFrame(() => repositionAllTiles());
 }
 
-/** Sets grid edge length and rebuilds empty cell divs. Default play remains 4×4. */
+/** Sets grid edge length, rebuilds cells, and syncs grid tracks. Always rebuilds if size changes. */
 function setBoardSize(n) {
   const next = clampBoardSize(n);
-  if (next === SIZE && boardCells.children.length === next * next) {
-    boardEl.dataset.size = String(SIZE);
-    boardEl.setAttribute('aria-label', `${SIZE} by ${SIZE} game board`);
-    syncBoardGridLayout();
-    return;
-  }
   SIZE = next;
   boardEl.dataset.size = String(SIZE);
   boardEl.setAttribute('aria-label', `${SIZE} by ${SIZE} game board`);
@@ -334,25 +313,9 @@ function init() {
   bestEl.textContent = best;
   setBoardSize(readPreferredBoardSize());
   initBoardSizePicker();
-  setupBoardLayoutObserver();
   newGame();
   syncBoardSizePicker();
   setupFooterCrossPromo();
-}
-
-function setupBoardLayoutObserver() {
-  if (typeof ResizeObserver === 'undefined') return;
-  let roScheduled = false;
-  const ro = new ResizeObserver(() => {
-    if (roScheduled) return;
-    roScheduled = true;
-    requestAnimationFrame(() => {
-      roScheduled = false;
-      syncBoardGridLayout();
-      repositionAllTiles();
-    });
-  });
-  ro.observe(boardCells);
 }
 
 function buildCells() {
@@ -454,7 +417,6 @@ function spawnTile() {
 function move(dir) {
   closeBoardSizeMenu();
   if (boardSizeModal && !boardSizeModal.hidden) return;
-  syncBoardGridLayout();
   if (isAnimating || activeMode) return;
   if (isGameOver) return;
   if (won && !keepGoing) return;
@@ -933,14 +895,7 @@ function pulseLogoOnWin() {
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    syncBoardGridLayout();
-    for (let r = 0; r < SIZE; r++) {
-      for (let c = 0; c < SIZE; c++) {
-        if (grid && grid[r][c]) grid[r][c].position();
-      }
-    }
-  }, 80);
+  resizeTimer = setTimeout(() => repositionAllTiles(), 80);
 });
 
 // ─── Keyboard ────────────────────────────────────────────────────
