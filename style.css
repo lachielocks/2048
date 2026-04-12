@@ -295,8 +295,9 @@ body {
   position: absolute;
   inset: var(--gap);
   display: grid;
-  grid-template-columns: repeat(var(--grid-size, 4), 1fr);
-  grid-template-rows: repeat(var(--grid-size, 4), 1fr);
+  /* Tracks set inline in game.js (repeat(N, 1fr)) — CSS var in repeat() is unreliable in some browsers */
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: var(--gap);
 }
 
@@ -619,45 +620,44 @@ body {
   flex-shrink: 0;
 }
 
-.board-size-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.board-size-select-wrap {
   flex: 1;
   min-width: 0;
-  justify-content: flex-start;
+  max-width: 220px;
 }
 
-.board-size-opt {
+.board-size-select {
+  width: 100%;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 7px 12px;
-  border-radius: 100px;
+  padding: 9px 32px 9px 14px;
+  border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.1);
   background: #1e1e1e;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255,255,255,0.88);
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.board-size-opt:hover {
-  background: #252525;
-  color: rgba(255,255,255,0.85);
-  border-color: rgba(255,255,255,0.14);
-}
-
-.board-size-opt[aria-pressed="true"] {
-  background: var(--orange);
-  color: #fff;
-  border-color: var(--orange);
-  box-shadow: 0 0 14px rgba(255,107,43,0.35);
-}
-
-.board-size-opt:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255,107,43,0.35);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.45)' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.board-size-select:hover {
+  border-color: rgba(255,255,255,0.16);
+}
+
+.board-size-select:focus-visible {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(255,107,43,0.2);
+}
+
+.board-size-select option {
+  background: #1e1e1e;
+  color: rgba(255,255,255,0.92);
 }
 
 .modal-card--narrow {
@@ -692,15 +692,9 @@ body {
 }
 
 @media (max-width: 400px) {
-  .board-size-options {
+  .board-size-select-wrap {
+    max-width: none;
     width: 100%;
-  }
-
-  .board-size-opt {
-    flex: 1 1 calc(33.333% - 6px);
-    min-width: 0;
-    text-align: center;
-    padding: 8px 6px;
   }
 }
 

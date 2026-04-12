@@ -52,14 +52,16 @@
       </div>
     </header>
 
-    <div class="board-size-bar" role="group" aria-label="Board size">
-      <span class="board-size-bar-label">Board size</span>
-      <div class="board-size-options" id="board-size-picker">
-        <button type="button" class="board-size-opt" data-size="4" aria-pressed="true">4×4</button>
-        <button type="button" class="board-size-opt" data-size="5">5×5</button>
-        <button type="button" class="board-size-opt" data-size="6">6×6</button>
-        <button type="button" class="board-size-opt" data-size="7">7×7</button>
-        <button type="button" class="board-size-opt" data-size="8">8×8</button>
+    <div class="board-size-bar">
+      <label class="board-size-bar-label" for="board-size-select">Board size</label>
+      <div class="board-size-select-wrap">
+        <select id="board-size-select" class="board-size-select">
+          <option value="4">4×4 — Classic</option>
+          <option value="5">5×5</option>
+          <option value="6">6×6</option>
+          <option value="7">7×7</option>
+          <option value="8">8×8</option>
+        </select>
       </div>
     </div>
 

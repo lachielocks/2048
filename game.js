@@ -80,7 +80,7 @@ const deleteSubEl  = document.getElementById('delete-sub');
 const swapFills   = [0, 1, 2].map(i => document.getElementById('swap-fill-'   + i));
 const deleteFills = [0, 1, 2].map(i => document.getElementById('delete-fill-' + i));
 
-const boardSizePicker       = document.getElementById('board-size-picker');
+const boardSizeSelect       = document.getElementById('board-size-select');
 const boardSizeModal        = document.getElementById('board-size-modal');
 const boardSizeModalText    = document.getElementById('board-size-modal-text');
 const boardSizeModalCancel  = document.getElementById('board-size-modal-cancel');
@@ -99,19 +99,42 @@ function clampBoardSize(n) {
   return Math.max(MIN_BOARD_SIZE, Math.min(MAX_BOARD_SIZE, x));
 }
 
+/** Apply N×N grid tracks (repeat(var(), 1fr) is broken in some browsers). */
+function syncBoardGridLayout() {
+  const track = `repeat(${SIZE}, 1fr)`;
+  boardCells.style.gridTemplateColumns = track;
+  boardCells.style.gridTemplateRows = track;
+  tilesContainer.style.gridTemplateColumns = track;
+  tilesContainer.style.gridTemplateRows = track;
+}
+
+function repositionAllTiles() {
+  if (!grid) return;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c]) grid[r][c].position();
+    }
+  }
+}
+
+function scheduleTileLayoutFix() {
+  requestAnimationFrame(() => repositionAllTiles());
+}
+
 /** Sets grid edge length and rebuilds empty cell divs. Default play remains 4×4. */
 function setBoardSize(n) {
   const next = clampBoardSize(n);
   if (next === SIZE && boardCells.children.length === next * next) {
     boardEl.dataset.size = String(SIZE);
     boardEl.setAttribute('aria-label', `${SIZE} by ${SIZE} game board`);
+    syncBoardGridLayout();
     return;
   }
   SIZE = next;
-  boardEl.style.setProperty('--grid-size', String(SIZE));
   boardEl.dataset.size = String(SIZE);
   boardEl.setAttribute('aria-label', `${SIZE} by ${SIZE} game board`);
   buildCells();
+  syncBoardGridLayout();
 }
 
 function readPreferredBoardSize() {
@@ -127,11 +150,8 @@ function isGameInProgress() {
 }
 
 function syncBoardSizePicker() {
-  if (!boardSizePicker) return;
-  boardSizePicker.querySelectorAll('.board-size-opt').forEach((btn) => {
-    const n = clampBoardSize(btn.dataset.size);
-    btn.setAttribute('aria-pressed', n === SIZE ? 'true' : 'false');
-  });
+  if (!boardSizeSelect) return;
+  boardSizeSelect.value = String(SIZE);
 }
 
 function applyBoardSizeChange(n) {
@@ -161,11 +181,15 @@ function trySelectBoardSize(n) {
 }
 
 function initBoardSizePicker() {
-  if (!boardSizePicker) return;
-  boardSizePicker.addEventListener('click', (e) => {
-    const btn = e.target.closest('.board-size-opt');
-    if (!btn) return;
-    trySelectBoardSize(btn.dataset.size);
+  boardSizeSelect?.addEventListener('change', () => {
+    const n = clampBoardSize(boardSizeSelect.value);
+    if (n === SIZE) return;
+    if (isGameInProgress()) {
+      boardSizeSelect.value = String(SIZE);
+      trySelectBoardSize(n);
+      return;
+    }
+    trySelectBoardSize(n);
   });
 
   boardSizeModalCancel?.addEventListener('click', () => {
@@ -332,12 +356,14 @@ function newGame() {
       if (demoPayload.won) { won = true; }
       isUntrackedGame = true;
       syncBoardSizePicker();
+      scheduleTileLayoutFix();
       return;
     }
   }
 
   spawnTile();
   spawnTile();
+  scheduleTileLayoutFix();
 }
 
 // ─── Spawn ───────────────────────────────────────────────────────
@@ -1052,6 +1078,7 @@ window.applyGameState = function (state) {
   updatePowerUpUI();
   persistPreferredBoardSize(SIZE);
   syncBoardSizePicker();
+  scheduleTileLayoutFix();
 };
 
 // ─── Boot ────────────────────────────────────────────────────────
