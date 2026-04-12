@@ -1,0 +1,28 @@
+---
+description: 2048 app identity, brand, and default classic board requirement
+alwaysApply: true
+---
+
+# 2048 — product context
+
+## Default experience (non-negotiable)
+
+- The app must **always** ship with a **plain, original classic 2048**: **4×4 grid**, standard merge rules, no alternate topology as the default.
+- **First load**, **New Game**, and any **reset to defaults** must use this classic board unless the player has explicitly chosen another layout in-session or via a saved preference.
+- If you add **optional** modes (5×5, larger squares, hex, etc.), treat them as **opt-in experiments** — do not replace or hide the classic default.
+
+## Stack and layout
+
+- **Vanilla** HTML (`index.html`), CSS (`style.css`), ES modules-free JS (`game.js` and siblings). No build step.
+- Core game: `game.js` (`SIZE = 4`), grid in `#board-cells` / `#tiles-container`, events `game:new`, `game:move`, `game:end`, `game:merge2048`.
+- Backend: Supabase (auth, games, achievements, leaderboard). PWA: `manifest.json`, `sw.js`.
+
+## Brand and UI
+
+- **Accent / brand orange**: `#FF6B2B` (`--orange`), hot `#ff3d00` (`--orange-hot`). Used for logo glow, primary CTAs, active states, 2048 tile, focus rings.
+- **Surfaces**: page `#0f0f0f`, board `#1a1a1a`, cells `#242424`, muted text via `--text-muted` / `--text-dim`.
+- **Typography**: **Bricolage Grotesque** (logo, scores, tiles) · **Geist** (UI copy, modals).
+- **Tile ramp**: warm beiges → oranges → golds → purple (1024) → brand orange shimmer (2048) → conic “galaxy” (4096+). Match existing `style.css` selectors when extending values.
+- **Tone**: polished dark UI, pill buttons, rounded board/tiles (`--radius-board`, `--radius-tile`), subtle orange board glow.
+
+When adding features (e.g. board size picker), preserve this visual system and keep the classic 4×4 path the simplest, most prominent default.
