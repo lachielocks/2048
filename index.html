@@ -374,6 +374,14 @@
       });
     }
   </script>
+  <script type="importmap">
+    {
+      "imports": {
+        "@vercel/analytics": "./node_modules/@vercel/analytics/dist/index.mjs"
+      }
+    }
+  </script>
+  <script type="module" src="/vercel-analytics.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>window.refreshIcons = () => typeof lucide !== 'undefined' && lucide.createIcons();</script>
