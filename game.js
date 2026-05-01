@@ -97,6 +97,11 @@ let currentDailyId = null;
 let isHardcore = false;
 let isModeStatusSticky = false;
 let activeRng = null;
+let pendingDailyPayload = null;
+let hintArrowAnimation = null;
+let hintArrowHideTimer = null;
+let dailyChallengeModalRequestId = 0;
+let dailyChallengeModalOpen = false;
 
 // Board size UI (confirm before abandoning a game)
 let pendingBoardSize = null;
@@ -156,6 +161,16 @@ const shareBtnEl          = document.getElementById('share-btn');
 const puzzleSelectEl      = document.getElementById('puzzle-select');
 const startPuzzleBtnEl    = document.getElementById('start-puzzle-btn');
 const modeStatusEl        = document.getElementById('mode-status');
+const hintArrowOverlayEl  = document.getElementById('hint-arrow-overlay');
+const hintArrowEl         = document.getElementById('hint-arrow');
+const dailyChallengeModalEl       = document.getElementById('daily-challenge-modal');
+const dailyChallengeCloseBtnEl    = document.getElementById('daily-challenge-close-btn');
+const dailyChallengeCancelBtnEl   = document.getElementById('daily-challenge-cancel-btn');
+const dailyChallengeGoBtnEl       = document.getElementById('daily-challenge-go-btn');
+const dailyChallengeDescriptionEl = document.getElementById('daily-challenge-description');
+const dailyChallengeRulesEl       = document.getElementById('daily-challenge-rules');
+const dailyChallengeLbBodyEl      = document.getElementById('daily-challenge-lb-body');
+const dailyChallengeLbStatusEl    = document.getElementById('daily-challenge-lb-status');
 
 // ─── Cell sizing helper ──────────────────────────────────────────
 // Compute from the board element's actual rendered width — no dependency on grid layout timing.
@@ -406,10 +421,134 @@ function buildPuzzlePayload(puzzle) {
   };
 }
 
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatDateHuman(isoDate) {
+  const [y, m, d] = String(isoDate || '').split('-').map(Number);
+  if (!y || !m || !d) return String(isoDate || '');
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function getDailyChallengeSummary(payload) {
+  if (!payload || !Array.isArray(payload.board)) return null;
+  const size = clampBoardSize(payload.board.length || DEFAULT_BOARD_SIZE);
+  let nonZero = 0;
+  let highest = 0;
+  for (const row of payload.board) {
+    if (!Array.isArray(row)) continue;
+    for (const v of row) {
+      const n = Number(v) || 0;
+      if (!n) continue;
+      nonZero++;
+      if (n > highest) highest = n;
+    }
+  }
+  return { size, nonZero, highest: highest || 2 };
+}
+
+function renderDailyChallengeRows(rows) {
+  if (!dailyChallengeLbBodyEl) return;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    dailyChallengeLbBodyEl.innerHTML = '<tr><td colspan="4" class="lb-empty">No scores posted yet today.</td></tr>';
+    return;
+  }
+  const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : null;
+  const currentName = String(currentUser?.user_metadata?.display_name || '').toLowerCase();
+  dailyChallengeLbBodyEl.innerHTML = rows.map((row, idx) => {
+    const rank = idx + 1;
+    const rankClass = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : '';
+    const name = String(row?.display_name || 'Anonymous');
+    const isMe = !!currentName && name.toLowerCase() === currentName;
+    return `
+      <tr class="${isMe ? 'leaderboard-current-user' : ''}">
+        <td class="lb-rank ${rankClass}">${rank}</td>
+        <td class="lb-name">${escHtml(name)}${isMe ? ' <span class="lb-you">(you)</span>' : ''}</td>
+        <td class="lb-main">${Number(row?.best_score || 0).toLocaleString()}</td>
+        <td class="lb-sec">${Number(row?.best_tile || 0).toLocaleString()}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadDailyChallengeLeaderboard(challengeId) {
+  if (!dailyChallengeLbStatusEl || !dailyChallengeLbBodyEl) return;
+  dailyChallengeLbBodyEl.innerHTML = '';
+  dailyChallengeLbStatusEl.textContent = 'Loading today’s results…';
+  const requestId = ++dailyChallengeModalRequestId;
+  try {
+    const { data, error } = await window.db.getDailyChallengeLeaderboard(challengeId);
+    if (requestId !== dailyChallengeModalRequestId || !dailyChallengeModalOpen) return;
+    if (error) throw error;
+    renderDailyChallengeRows(data || []);
+    dailyChallengeLbStatusEl.textContent = (data && data.length)
+      ? `Top ${data.length} run${data.length === 1 ? '' : 's'} today`
+      : 'No scores posted yet — you could be first.';
+  } catch {
+    if (requestId !== dailyChallengeModalRequestId || !dailyChallengeModalOpen) return;
+    renderDailyChallengeRows([]);
+    dailyChallengeLbStatusEl.textContent = 'Could not load today’s leaderboard right now.';
+  }
+}
+
+function closeDailyChallengeModal() {
+  if (!dailyChallengeModalEl) return;
+  dailyChallengeModalOpen = false;
+  dailyChallengeModalRequestId++;
+  pendingDailyPayload = null;
+  dailyChallengeModalEl.hidden = true;
+}
+
 function runDailyChallenge() {
   const challengeId = getTodayChallengeId();
-  const payload = buildDailyChallengePayload(challengeId);
+  const payload = pendingDailyPayload && pendingDailyPayload.dailyId === challengeId
+    ? pendingDailyPayload
+    : buildDailyChallengePayload(challengeId);
+  pendingDailyPayload = null;
   loadBoardPayload(payload);
+}
+
+function confirmDailyChallengeStart() {
+  if (dailyChallengeModalOpen) closeDailyChallengeModal();
+  runDailyChallenge();
+}
+
+function openDailyChallengeModal() {
+  if (!dailyChallengeModalEl) {
+    runDailyChallenge();
+    return;
+  }
+  const challengeId = getTodayChallengeId();
+  const payload = buildDailyChallengePayload(challengeId);
+  pendingDailyPayload = payload;
+  dailyChallengeModalOpen = true;
+
+  const summary = getDailyChallengeSummary(payload);
+  if (dailyChallengeDescriptionEl) {
+    dailyChallengeDescriptionEl.textContent =
+      `${formatDateHuman(challengeId)} challenge: everyone gets the same seeded ${summary?.size || 4}×${summary?.size || 4} opening board.`;
+  }
+  if (dailyChallengeRulesEl) {
+    const spawnCount = getSpawnCountForBoardSize(summary?.size || DEFAULT_BOARD_SIZE);
+    const scoreMult = getScoreMultiplierForBoardSize(summary?.size || DEFAULT_BOARD_SIZE);
+    const highest = Number(summary?.highest || 2).toLocaleString();
+    const scoreRule = scoreMult < 1 ? 'Merge scoring is reduced to 50%.' : 'Merge scoring is standard.';
+    dailyChallengeRulesEl.textContent =
+      `Start with ${summary?.nonZero || 2} tiles (highest ${highest}). ${spawnCount} tile${spawnCount === 1 ? '' : 's'} spawn per move. ${scoreRule}`;
+  }
+  dailyChallengeModalEl.hidden = false;
+  loadDailyChallengeLeaderboard(challengeId);
+  window.refreshIcons?.();
 }
 
 function runSelectedPuzzle() {
@@ -430,6 +569,69 @@ function getHintDirection() {
   return window.getBestMove?.(board) || null;
 }
 
+function hideHintArrow() {
+  if (!hintArrowOverlayEl || !hintArrowEl) return;
+  if (hintArrowHideTimer) {
+    clearTimeout(hintArrowHideTimer);
+    hintArrowHideTimer = null;
+  }
+  if (hintArrowAnimation) {
+    hintArrowAnimation.cancel();
+    hintArrowAnimation = null;
+  }
+  hintArrowOverlayEl.classList.remove('hint-arrow-overlay--visible');
+  hintArrowEl.style.opacity = '0';
+  hintArrowEl.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+}
+
+function showHintDirectionArrow(dir) {
+  if (!hintArrowOverlayEl || !hintArrowEl) return;
+  const cfg = {
+    left:  { start: ['112%', '50%'], end: ['-12%', '50%'], rotate: 180, className: 'hint-arrow-overlay--left' },
+    right: { start: ['-12%', '50%'], end: ['112%', '50%'], rotate: 0, className: 'hint-arrow-overlay--right' },
+    up:    { start: ['50%', '112%'], end: ['50%', '-12%'], rotate: -90, className: 'hint-arrow-overlay--up' },
+    down:  { start: ['50%', '-12%'], end: ['50%', '112%'], rotate: 90, className: 'hint-arrow-overlay--down' },
+  }[dir];
+  if (!cfg) return;
+
+  if (hintArrowAnimation) {
+    hintArrowAnimation.cancel();
+    hintArrowAnimation = null;
+  }
+  if (hintArrowHideTimer) {
+    clearTimeout(hintArrowHideTimer);
+    hintArrowHideTimer = null;
+  }
+
+  hintArrowOverlayEl.classList.remove(
+    'hint-arrow-overlay--left',
+    'hint-arrow-overlay--right',
+    'hint-arrow-overlay--up',
+    'hint-arrow-overlay--down'
+  );
+  hintArrowOverlayEl.classList.add('hint-arrow-overlay--visible', cfg.className);
+  hintArrowEl.style.left = cfg.start[0];
+  hintArrowEl.style.top = cfg.start[1];
+  hintArrowEl.style.opacity = '1';
+  hintArrowEl.style.transform = `translate(-50%, -50%) rotate(${cfg.rotate}deg)`;
+
+  hintArrowAnimation = hintArrowEl.animate([
+    { left: cfg.start[0], top: cfg.start[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 0.2, offset: 0 },
+    { left: cfg.start[0], top: cfg.start[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 1, offset: 0.1 },
+    { left: cfg.end[0], top: cfg.end[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 1, offset: 0.84 },
+    { left: cfg.end[0], top: cfg.end[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 0, offset: 1 },
+  ], {
+    duration: 1200,
+    easing: 'cubic-bezier(0.25, 0.85, 0.3, 1)',
+    fill: 'forwards',
+  });
+  hintArrowAnimation.onfinish = () => {
+    hintArrowAnimation = null;
+    hideHintArrow();
+  };
+  hintArrowHideTimer = setTimeout(hideHintArrow, 1350);
+}
+
 function showHint() {
   if (isReplaying || isAnimating || isGameOver || (won && !keepGoing)) return;
   const dir = getHintDirection();
@@ -439,6 +641,7 @@ function showHint() {
   }
   const map = { left: '← Left', right: '→ Right', up: '↑ Up', down: '↓ Down' };
   refreshModeStatus(`Hint: ${map[dir] || dir}`, true);
+  showHintDirectionArrow(dir);
   setTimeout(() => refreshModeStatus(undefined, false), 1400);
 }
 
@@ -565,12 +768,18 @@ function initFeatureControls() {
   restoreLastFinishedGame();
   setHardcoreEnabled(localStorage.getItem(HARDCORE_MODE_KEY) === '1', false);
 
-  dailyChallengeBtnEl?.addEventListener('click', runDailyChallenge);
+  dailyChallengeBtnEl?.addEventListener('click', openDailyChallengeModal);
   startPuzzleBtnEl?.addEventListener('click', runSelectedPuzzle);
   hardcoreToggleBtnEl?.addEventListener('click', toggleHardcoreMode);
   hintBtnEl?.addEventListener('click', showHint);
   replayBtnEl?.addEventListener('click', startReplay);
   shareBtnEl?.addEventListener('click', shareLastGame);
+  dailyChallengeGoBtnEl?.addEventListener('click', confirmDailyChallengeStart);
+  dailyChallengeCancelBtnEl?.addEventListener('click', closeDailyChallengeModal);
+  dailyChallengeCloseBtnEl?.addEventListener('click', closeDailyChallengeModal);
+  dailyChallengeModalEl?.addEventListener('click', (e) => {
+    if (e.target === dailyChallengeModalEl) closeDailyChallengeModal();
+  });
 }
 
 /** Apply N×N grid tracks (repeat(var(), 1fr) is unreliable; minmax avoids flex blowout). */
@@ -1438,6 +1647,11 @@ window.addEventListener('keydown', (e) => {
       pendingBoardSize = null;
       boardSizeModal.hidden = true;
       syncBoardSizePicker();
+      return;
+    }
+    if (dailyChallengeModalEl && !dailyChallengeModalEl.hidden) {
+      e.preventDefault();
+      closeDailyChallengeModal();
       return;
     }
     if (activeMode) { e.preventDefault(); setActiveMode(null); }

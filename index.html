@@ -103,6 +103,11 @@
         <div class="board" id="board" role="grid" aria-label="Game board">
           <div class="board-cells" id="board-cells" aria-hidden="true"></div>
           <div class="tiles-container" id="tiles-container"></div>
+          <div class="hint-arrow-overlay" id="hint-arrow-overlay" aria-hidden="true">
+            <div class="hint-arrow" id="hint-arrow">
+              <i data-lucide="arrow-right"></i>
+            </div>
+          </div>
         </div>
 
         <div class="overlay" id="win-overlay" role="dialog" aria-modal="true" aria-label="You win!" hidden>
@@ -183,6 +188,34 @@
       <div class="modal-inline-actions">
         <button type="button" class="btn btn-secondary" id="board-size-modal-cancel">Cancel</button>
         <button type="button" class="btn" id="board-size-modal-confirm">New game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Daily Challenge Modal ─────────────────────────────────── -->
+  <div id="daily-challenge-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="daily-challenge-title">
+    <div class="modal-card modal-card--wide">
+      <button class="modal-close-btn" id="daily-challenge-close-btn" aria-label="Close"><i data-lucide="x"></i></button>
+      <h2 class="modal-title" id="daily-challenge-title">Today&rsquo;s Daily Challenge</h2>
+      <p class="modal-lede" id="daily-challenge-description">Loading challenge details…</p>
+      <p class="daily-challenge-rules" id="daily-challenge-rules"></p>
+
+      <div class="daily-challenge-leaderboard">
+        <p class="daily-challenge-leaderboard__title">Today&rsquo;s leaderboard</p>
+        <div class="lb-table-wrapper">
+          <table class="lb-table daily-challenge-table">
+            <thead>
+              <tr><th>Rank</th><th>Player</th><th>Score</th><th>Best Tile</th></tr>
+            </thead>
+            <tbody id="daily-challenge-lb-body"></tbody>
+          </table>
+        </div>
+        <p class="daily-challenge-status" id="daily-challenge-lb-status">Loading today&rsquo;s results…</p>
+      </div>
+
+      <div class="modal-inline-actions">
+        <button type="button" class="btn btn-secondary" id="daily-challenge-cancel-btn">Nah</button>
+        <button type="button" class="btn" id="daily-challenge-go-btn">Let&rsquo;s go!</button>
       </div>
     </div>
   </div>

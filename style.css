@@ -307,6 +307,65 @@ body {
   gap: var(--gap);
 }
 
+.hint-arrow-overlay {
+  position: absolute;
+  inset: var(--gap);
+  pointer-events: none;
+  z-index: 70;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.hint-arrow-overlay--visible {
+  opacity: 1;
+}
+
+.hint-arrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(44px, 9vw, 62px);
+  height: clamp(44px, 9vw, 62px);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border: 1px solid rgba(255,107,43,0.75);
+  background: rgba(255,107,43,0.28);
+  box-shadow:
+    0 0 16px rgba(255,107,43,0.5),
+    0 0 42px rgba(255,107,43,0.18);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+}
+
+.hint-arrow .lucide {
+  width: clamp(22px, 4vw, 30px);
+  height: clamp(22px, 4vw, 30px);
+}
+
+.hint-arrow-overlay--left .hint-arrow {
+  left: 100%;
+  top: 50%;
+}
+
+.hint-arrow-overlay--right .hint-arrow {
+  left: 0%;
+  top: 50%;
+}
+
+.hint-arrow-overlay--up .hint-arrow {
+  left: 50%;
+  top: 100%;
+}
+
+.hint-arrow-overlay--down .hint-arrow {
+  left: 50%;
+  top: 0%;
+}
+
 /* ─── Cells (empty squares) ────────────────────────────────────── */
 .cell {
   background: var(--cell-bg);
@@ -1572,6 +1631,46 @@ a.auth-dropdown-item {
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.daily-challenge-rules {
+  margin-top: -8px;
+  margin-bottom: 14px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.daily-challenge-leaderboard {
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.daily-challenge-leaderboard__title {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.daily-challenge-table th,
+.daily-challenge-table td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.daily-challenge-status {
+  margin-top: 10px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .lb-filter-row {
