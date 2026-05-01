@@ -1058,8 +1058,58 @@ body {
 /* ─── Below-board actions ─────────────────────────────────────── */
 .below-board-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+}
+
+.puzzle-controls {
+  margin-top: 10px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.puzzle-controls__label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.puzzle-controls__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.puzzle-controls__select {
+  flex: 1;
+  min-width: 0;
+  background: #242424;
+  color: rgba(255,255,255,0.92);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.puzzle-controls__select:focus-visible {
+  outline: 2px solid rgba(255,107,43,0.55);
+  outline-offset: 1px;
+}
+
+.mode-status {
+  margin: 10px 0 2px;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 /* ─── Auth pill button ────────────────────────────────────────── */
@@ -1522,6 +1572,35 @@ a.auth-dropdown-item {
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.lb-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+
+.lb-filter-row label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lb-board-filter {
+  appearance: none;
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.88);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.lb-board-filter:focus-visible {
+  outline: 2px solid rgba(255,107,43,0.55);
+  outline-offset: 1px;
 }
 
 /* ─── Leaderboard table ───────────────────────────────────────── */

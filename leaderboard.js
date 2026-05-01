@@ -3,6 +3,7 @@
 
 (function () {
   let activeTab = 'top';
+  let activeBoardSize = 'all';
   const cache = {};
 
   // ─── Open / close ────────────────────────────────────────────
@@ -29,6 +30,10 @@
   window.openLeaderboard = openLeaderboard;
 
   // ─── Tab switching ───────────────────────────────────────────
+  function buildCacheKey(tab) {
+    return `${tab}:${activeBoardSize}`;
+  }
+
   function loadTab(tab, force) {
     activeTab = tab;
     ['top', 'tile', 'week'].forEach((t) => {
@@ -36,8 +41,9 @@
       if (btn) btn.classList.toggle('active', t === tab);
     });
 
-    if (cache[tab] && !force) {
-      renderRows(tab, cache[tab]);
+    const cacheKey = buildCacheKey(tab);
+    if (cache[cacheKey] && !force) {
+      renderRows(tab, cache[cacheKey]);
     } else {
       renderSkeleton();
       fetchTab(tab);
@@ -46,12 +52,13 @@
 
   // ─── Fetch ────────────────────────────────────────────────────
   async function fetchTab(tab) {
-    const { data, error } = await window.db.getLeaderboard(tab);
+    const boardSize = activeBoardSize === 'all' ? null : parseInt(activeBoardSize, 10);
+    const { data, error } = await window.db.getLeaderboard(tab, boardSize);
     if (error || !data) {
       renderError();
       return;
     }
-    cache[tab] = data;
+    cache[buildCacheKey(tab)] = data;
     renderRows(tab, data);
   }
 
@@ -140,10 +147,14 @@
     const refreshBtn = document.getElementById('lb-refresh-btn');
     const backdrop = document.getElementById('leaderboard-modal');
     const signInCta = document.getElementById('lb-signin-cta');
+    const boardFilter = document.getElementById('lb-board-filter');
 
     if (btn) btn.addEventListener('click', openLeaderboard);
     if (closeBtn) closeBtn.addEventListener('click', closeLeaderboard);
-    if (refreshBtn) refreshBtn.addEventListener('click', () => { delete cache[activeTab]; loadTab(activeTab, true); });
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
+      Object.keys(cache).forEach((k) => { if (k.startsWith(activeTab + ':')) delete cache[k]; });
+      loadTab(activeTab, true);
+    });
     if (backdrop) backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeLeaderboard(); });
 
     ['top', 'tile', 'week'].forEach((t) => {
@@ -162,6 +173,13 @@
       signInCta.querySelector('button')?.addEventListener('click', () => {
         closeLeaderboard();
         if (typeof window.openAuthModal === 'function') window.openAuthModal('signup');
+      });
+    }
+
+    if (boardFilter) {
+      boardFilter.addEventListener('change', () => {
+        activeBoardSize = boardFilter.value || 'all';
+        loadTab(activeTab, false);
       });
     }
   }

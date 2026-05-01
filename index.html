@@ -130,7 +130,22 @@
 
     <div class="below-board-actions">
       <button class="btn" id="leaderboard-btn"><i data-lucide="trophy"></i> Leaderboard</button>
+      <button class="btn" id="daily-challenge-btn"><i data-lucide="calendar-days"></i> Daily Challenge</button>
+      <button class="btn" id="hardcore-toggle-btn"><i data-lucide="flame"></i> Hardcore: Off</button>
+      <button class="btn" id="hint-btn"><i data-lucide="lightbulb"></i> Hint</button>
+      <button class="btn" id="replay-btn" disabled><i data-lucide="history"></i> Replay</button>
+      <button class="btn" id="share-btn" disabled><i data-lucide="share-2"></i> Share</button>
     </div>
+
+    <section class="puzzle-controls" aria-label="Puzzle mode controls">
+      <label class="puzzle-controls__label" for="puzzle-select">Puzzle Mode</label>
+      <div class="puzzle-controls__row">
+        <select id="puzzle-select" class="puzzle-controls__select" aria-label="Choose a puzzle"></select>
+        <button class="btn" id="start-puzzle-btn"><i data-lucide="swords"></i> Start Puzzle</button>
+      </div>
+    </section>
+
+    <p id="mode-status" class="mode-status" aria-live="polite">Mode: Classic</p>
 
     <section class="how-to-play" aria-label="How to play">
       <h2 class="how-to-play__title">How to Play</h2>
@@ -244,6 +259,18 @@
         <button class="modal-tab active" id="lb-tab-top">Top Scores</button>
         <button class="modal-tab" id="lb-tab-tile">Highest Tile</button>
         <button class="modal-tab" id="lb-tab-week">This Week</button>
+      </div>
+
+      <div class="lb-filter-row">
+        <label for="lb-board-filter">Board size</label>
+        <select id="lb-board-filter" class="lb-board-filter">
+          <option value="all">All sizes</option>
+          <option value="4">4×4</option>
+          <option value="5">5×5</option>
+          <option value="6">6×6</option>
+          <option value="7">7×7</option>
+          <option value="8">8×8</option>
+        </select>
       </div>
 
       <div class="lb-table-wrapper">
