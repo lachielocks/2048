@@ -510,6 +510,10 @@ function move(dir) {
 }
 
 function afterSlide() {
+  let tile2048 = null;
+  let justWon = false;
+
+  // Process all merges first
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const t = grid[r][c];
@@ -533,21 +537,27 @@ function afterSlide() {
           }
         }
 
-        // Win — epic animation path for real games, instant for AI/demo
+        // Track 2048 tile for win handling after loop
         if (t.value === 2048 && !won) {
-          won = true;
-          if (!isAutoplay) {
-            // Hand off to win-animation.js; keep isAnimating = true to block input
-            spawnTile();
-            updatePowerUpUI();
-            document.dispatchEvent(new CustomEvent('game:merge2048', { detail: { tileEl: t.el } }));
-            return; // afterSlide returns early; win-animation calls finishWin2048 when done
-          }
-          showWinOverlay();
-          pulseLogoOnWin();
+          tile2048 = t;
+          justWon = true;
         }
       }
     }
+  }
+
+  // Handle win after all merges are processed
+  if (justWon) {
+    won = true;
+    if (!isAutoplay) {
+      // Hand off to win-animation.js; keep isAnimating = true to block input
+      spawnTile();
+      updatePowerUpUI();
+      document.dispatchEvent(new CustomEvent('game:merge2048', { detail: { tileEl: tile2048.el } }));
+      return; // afterSlide returns early; win-animation calls finishWin2048 when done
+    }
+    showWinOverlay();
+    pulseLogoOnWin();
   }
 
   spawnTile();
