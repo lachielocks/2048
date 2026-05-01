@@ -133,9 +133,20 @@
     </div>
 
     <section class="how-to-play" aria-label="How to play">
-      <strong>HOW TO PLAY:</strong> Use your <strong>arrow keys</strong> or <strong>WASD</strong> to move the tiles.
-      Tiles with the same number <strong>merge into one</strong> when they touch.
-      Add them up to reach <strong>2048!</strong>
+      <h2 class="how-to-play__title">How to Play</h2>
+      <p class="how-to-play__lede">
+        Use your <strong>arrow keys</strong> or <strong>WASD</strong> to move all tiles.
+        Matching numbers <strong>merge into one</strong> when they collide.
+        Keep combining to reach <strong>2048</strong> and beyond.
+      </p>
+      <h3 class="how-to-play__subtitle">Special rules for bigger grids</h3>
+      <ul class="how-to-play__rules">
+        <li><strong>4×4:</strong> 1 new tile appears after each move.</li>
+        <li><strong>5×5:</strong> 2 new tiles appear after each move.</li>
+        <li><strong>6×6:</strong> 3 new tiles appear after each move.</li>
+        <li><strong>7×7:</strong> 4 new tiles appear after each move, and merge score is reduced to 50%.</li>
+        <li><strong>8×8:</strong> 5 new tiles appear after each move, and merge score is reduced to 50%.</li>
+      </ul>
     </section>
 
     <footer class="footer">
