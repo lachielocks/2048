@@ -562,14 +562,52 @@ body {
 
 /* ─── How to play ─────────────────────────────────────────────── */
 .how-to-play {
+  background: #161616;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 18px;
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--text-muted);
   font-weight: 400;
 }
 
+.how-to-play__title {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.how-to-play__lede {
+  margin-bottom: 12px;
+}
+
+.how-to-play__subtitle {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.72);
+  margin-bottom: 8px;
+}
+
+.how-to-play__rules {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.how-to-play__rules li {
+  color: var(--text-dim);
+}
+
 .how-to-play strong {
-  color: rgba(255,255,255,0.6);
+  color: rgba(255,255,255,0.72);
   font-weight: 600;
 }
 

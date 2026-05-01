@@ -107,6 +107,25 @@ function clampBoardSize(n) {
   return Math.max(MIN_BOARD_SIZE, Math.min(MAX_BOARD_SIZE, x));
 }
 
+function getSpawnCountForBoardSize(size = SIZE) {
+  return Math.max(1, clampBoardSize(size) - 3);
+}
+
+function getScoreMultiplierForBoardSize(size = SIZE) {
+  return size >= 7 ? 0.5 : 1;
+}
+
+function getMergeScore(mergedValue) {
+  return Math.round(mergedValue * getScoreMultiplierForBoardSize());
+}
+
+function spawnTurnTiles() {
+  const spawnCount = getSpawnCountForBoardSize();
+  for (let i = 0; i < spawnCount; i++) {
+    if (!spawnTile()) break;
+  }
+}
+
 /** Apply N×N grid tracks (repeat(var(), 1fr) is unreliable; minmax avoids flex blowout). */
 function syncBoardGridLayout() {
   const track = `repeat(${SIZE}, minmax(0, 1fr))`;
@@ -475,7 +494,7 @@ function move(dir) {
       mergeWith.merging = true;
       mergeWith.absorbedTile = tile;
       mergeWith.newValue = mergeWith.value * 2;
-      scoreGain += mergeWith.newValue;
+      scoreGain += getMergeScore(mergeWith.newValue);
       moved = true;
     } else if (nr !== r || nc !== c) {
       grid[r][c] = null;
@@ -551,7 +570,7 @@ function afterSlide() {
     won = true;
     if (!isAutoplay) {
       // Hand off to win-animation.js; keep isAnimating = true to block input
-      spawnTile();
+      spawnTurnTiles();
       updatePowerUpUI();
       document.dispatchEvent(new CustomEvent('game:merge2048', { detail: { tileEl: tile2048.el } }));
       return; // afterSlide returns early; win-animation calls finishWin2048 when done
@@ -560,7 +579,7 @@ function afterSlide() {
     pulseLogoOnWin();
   }
 
-  spawnTile();
+  spawnTurnTiles();
 
   if (!hasValidMoves()) {
     isGameOver = true;
