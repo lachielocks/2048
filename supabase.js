@@ -28,15 +28,81 @@ async function saveGame(userId, gameData) {
 }
 
 // ─── Leaderboard queries ──────────────────────────────────────────
-async function getLeaderboard(tab) {
-  if (tab === 'top') {
+async function getLeaderboard(tab, boardSize = 'all') {
+  const boardSizeNum = Number(boardSize);
+  const useFilter = Number.isInteger(boardSizeNum) && boardSizeNum >= 4 && boardSizeNum <= 8;
+  if (tab === 'top' && !useFilter) {
     return supabaseClient.rpc('leaderboard_top_scores');
-  } else if (tab === 'tile') {
+  } else if (tab === 'tile' && !useFilter) {
     return supabaseClient.rpc('leaderboard_highest_tile');
-  } else if (tab === 'week') {
+  } else if (tab === 'week' && !useFilter) {
     return supabaseClient.rpc('leaderboard_this_week');
   }
-  return { data: [], error: null };
+
+  const query = supabaseClient
+    .from('games')
+    .select('score, highest_tile, created_at, board_state, profiles(display_name)');
+
+  const { data, error } = await query;
+  if (error || !data) return { data: [], error };
+
+  const weekCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const grouped = new Map();
+  for (const row of data) {
+    const size = inferBoardSizeFromRow(row);
+    if (useFilter && size !== boardSizeNum) continue;
+    if (tab === 'week') {
+      const ts = row.created_at ? Date.parse(row.created_at) : 0;
+      if (!ts || ts < weekCutoff) continue;
+    }
+    const name = row.profiles?.display_name || 'Anonymous';
+    const key = name.toLowerCase();
+    if (!grouped.has(key)) grouped.set(key, { display_name: name, best_score: 0, best_tile: 0 });
+    const agg = grouped.get(key);
+    agg.best_score = Math.max(agg.best_score, Number(row.score) || 0);
+    agg.best_tile = Math.max(agg.best_tile, Number(row.highest_tile) || 0);
+  }
+
+  let rows = [...grouped.values()];
+  if (tab === 'tile') rows.sort((a, b) => (b.best_tile - a.best_tile) || (b.best_score - a.best_score));
+  else rows.sort((a, b) => (b.best_score - a.best_score) || (b.best_tile - a.best_tile));
+
+  rows = rows.slice(0, 10);
+  return { data: rows, error: null };
+}
+
+async function getDailyChallengeLeaderboard(challengeId) {
+  if (!challengeId) return { data: [], error: null };
+  const startIso = new Date(`${challengeId}T00:00:00.000Z`).toISOString();
+  const endIso = new Date(`${challengeId}T23:59:59.999Z`).toISOString();
+  const modeCode = `daily:${challengeId}`;
+  const { data, error } = await supabaseClient
+    .from('games')
+    .select('score, highest_tile, created_at, mode, board_state, profiles(display_name)')
+    .or(`mode.eq.${modeCode},mode.eq.${modeCode}:hardcore`)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso);
+
+  if (error || !data) return { data: [], error };
+  const grouped = new Map();
+  for (const row of data) {
+    const name = row.profiles?.display_name || 'Anonymous';
+    const key = name.toLowerCase();
+    if (!grouped.has(key)) grouped.set(key, { display_name: name, best_score: 0, best_tile: 0 });
+    const agg = grouped.get(key);
+    agg.best_score = Math.max(agg.best_score, Number(row.score) || 0);
+    agg.best_tile = Math.max(agg.best_tile, Number(row.highest_tile) || 0);
+  }
+  const rows = [...grouped.values()]
+    .sort((a, b) => (b.best_score - a.best_score) || (b.best_tile - a.best_tile))
+    .slice(0, 10);
+  return { data: rows, error: null };
+}
+
+function inferBoardSizeFromRow(row) {
+  const b = row?.board_state;
+  if (Array.isArray(b) && b.length && b.every(r => Array.isArray(r) && r.length === b.length)) return b.length;
+  return 4;
 }
 
 // ─── User stats ───────────────────────────────────────────────────
@@ -146,6 +212,7 @@ window.db = {
   client: supabaseClient,
   saveGame,
   getLeaderboard,
+  getDailyChallengeLeaderboard,
   getUserStats,
   getUserGames,
   getUnlockedAchievements,

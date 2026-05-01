@@ -8,6 +8,50 @@ const MAX_BOARD_SIZE = 8;
 const PREFERRED_SIZE_KEY = 'preferredBoardSize';
 const SPAWN_2_PROB = 0.9;
 const SLIDE_MS = 100; // must match CSS --transition-slide
+const HARDCORE_MODE_KEY = 'hardcoreModeEnabled';
+const LAST_FINISHED_GAME_KEY = 'lastFinishedGame2048';
+
+const PUZZLE_DEFS = [
+  {
+    key: 'tight-corner',
+    label: 'Tight Corner (4×4)',
+    modeLabel: 'Puzzle: Tight Corner',
+    board: [
+      [128, 64, 32, 16],
+      [64, 32, 16, 8],
+      [8, 4, 2, 0],
+      [2, 0, 0, 0],
+    ],
+    score: 980,
+  },
+  {
+    key: 'near-1024',
+    label: 'Near 1024 (5×5)',
+    modeLabel: 'Puzzle: Near 1024',
+    board: [
+      [512, 512, 128, 64, 32],
+      [64, 32, 16, 8, 4],
+      [16, 8, 4, 2, 0],
+      [4, 2, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+    ],
+    score: 3100,
+  },
+  {
+    key: 'high-density',
+    label: 'High Density (6×6)',
+    modeLabel: 'Puzzle: High Density',
+    board: [
+      [256, 128, 64, 32, 16, 8],
+      [128, 64, 32, 16, 8, 4],
+      [64, 32, 16, 8, 4, 2],
+      [32, 16, 8, 4, 2, 0],
+      [16, 8, 4, 2, 0, 0],
+      [0, 0, 0, 0, 0, 0],
+    ],
+    score: 5400,
+  },
+];
 
 // ─── State ───────────────────────────────────────────────────────
 let SIZE = DEFAULT_BOARD_SIZE; // square edge length (classic 2048 = 4)
@@ -39,6 +83,25 @@ let autoplayTimer = null;
 
 // Set true for AI or demo games — skips best-score update + game:end event
 let isUntrackedGame = false;
+let isReplaying = false;
+let replayTimer = null;
+let replayFrames = [];
+let lastReplaySignature = '';
+let lastFinishedGame = null;
+
+// Mode flags
+let currentMode = 'classic'; // classic | daily | puzzle
+let currentModeLabel = 'Classic';
+let currentPuzzleKey = null;
+let currentDailyId = null;
+let isHardcore = false;
+let isModeStatusSticky = false;
+let activeRng = null;
+let pendingDailyPayload = null;
+let hintArrowAnimation = null;
+let hintArrowHideTimer = null;
+let dailyChallengeModalRequestId = 0;
+let dailyChallengeModalOpen = false;
 
 // Board size UI (confirm before abandoning a game)
 let pendingBoardSize = null;
@@ -89,6 +152,26 @@ const boardSizeModalText    = document.getElementById('board-size-modal-text');
 const boardSizeModalCancel  = document.getElementById('board-size-modal-cancel');
 const boardSizeModalConfirm = document.getElementById('board-size-modal-confirm');
 
+// Feature controls
+const dailyChallengeBtnEl = document.getElementById('daily-challenge-btn');
+const hardcoreToggleBtnEl = document.getElementById('hardcore-toggle-btn');
+const hintBtnEl           = document.getElementById('hint-btn');
+const replayBtnEl         = document.getElementById('replay-btn');
+const shareBtnEl          = document.getElementById('share-btn');
+const puzzleSelectEl      = document.getElementById('puzzle-select');
+const startPuzzleBtnEl    = document.getElementById('start-puzzle-btn');
+const modeStatusEl        = document.getElementById('mode-status');
+const hintArrowOverlayEl  = document.getElementById('hint-arrow-overlay');
+const hintArrowEl         = document.getElementById('hint-arrow');
+const dailyChallengeModalEl       = document.getElementById('daily-challenge-modal');
+const dailyChallengeCloseBtnEl    = document.getElementById('daily-challenge-close-btn');
+const dailyChallengeCancelBtnEl   = document.getElementById('daily-challenge-cancel-btn');
+const dailyChallengeGoBtnEl       = document.getElementById('daily-challenge-go-btn');
+const dailyChallengeDescriptionEl = document.getElementById('daily-challenge-description');
+const dailyChallengeRulesEl       = document.getElementById('daily-challenge-rules');
+const dailyChallengeLbBodyEl      = document.getElementById('daily-challenge-lb-body');
+const dailyChallengeLbStatusEl    = document.getElementById('daily-challenge-lb-status');
+
 // ─── Cell sizing helper ──────────────────────────────────────────
 // Compute from the board element's actual rendered width — no dependency on grid layout timing.
 function getCellSize() {
@@ -124,6 +207,579 @@ function spawnTurnTiles() {
   for (let i = 0; i < spawnCount; i++) {
     if (!spawnTile()) break;
   }
+}
+
+function hashString(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return function () {
+    t += 0x6D2B79F5;
+    let x = t;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randomValue() {
+  return activeRng ? activeRng() : Math.random();
+}
+
+function buildModeCode() {
+  let code = currentMode;
+  if (currentPuzzleKey) code += `:${currentPuzzleKey}`;
+  if (currentDailyId) code += `:${currentDailyId}`;
+  if (isHardcore) code += ':hardcore';
+  return code;
+}
+
+function parseModeCode(modeCode) {
+  const parts = String(modeCode || 'classic').split(':').filter(Boolean);
+  const base = parts[0] || 'classic';
+  const meta = { mode: base, puzzleKey: null, dailyId: null };
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i];
+    if (p === 'hardcore') continue;
+    if (base === 'puzzle' && !meta.puzzleKey) meta.puzzleKey = p;
+    if (base === 'daily' && !meta.dailyId) meta.dailyId = p;
+  }
+  return meta;
+}
+
+function refreshModeStatus(textOverride, sticky) {
+  if (typeof sticky === 'boolean') isModeStatusSticky = sticky;
+  if (!modeStatusEl) return;
+  if (textOverride) {
+    modeStatusEl.textContent = textOverride;
+    return;
+  }
+  const extras = [];
+  if (isHardcore) extras.push('Hardcore');
+  const suffix = extras.length ? ` • ${extras.join(' • ')}` : '';
+  modeStatusEl.textContent = `Mode: ${currentModeLabel}${suffix}`;
+}
+
+function setRuntimeMode(modeInfo) {
+  const info = modeInfo || {};
+  currentMode = info.mode || 'classic';
+  currentModeLabel = info.modeLabel || 'Classic';
+  currentPuzzleKey = info.puzzleKey || null;
+  currentDailyId = info.dailyId || null;
+  activeRng = info.rngSeed ? mulberry32(hashString(info.rngSeed)) : null;
+  refreshModeStatus();
+}
+
+function updateHardcoreToggleUI() {
+  if (!hardcoreToggleBtnEl) return;
+  hardcoreToggleBtnEl.textContent = isHardcore ? 'Hardcore: On' : 'Hardcore: Off';
+  hardcoreToggleBtnEl.classList.toggle('active', isHardcore);
+}
+
+function setHardcoreEnabled(enabled, persist = true) {
+  isHardcore = !!enabled;
+  if (persist) {
+    localStorage.setItem(HARDCORE_MODE_KEY, isHardcore ? '1' : '0');
+  }
+  if (isHardcore) setActiveMode(null);
+  updateHardcoreToggleUI();
+  updatePowerUpUI();
+  refreshModeStatus();
+}
+
+function initPuzzleControls() {
+  if (!puzzleSelectEl) return;
+  puzzleSelectEl.innerHTML = PUZZLE_DEFS.map(p =>
+    `<option value="${p.key}">${p.label}</option>`
+  ).join('');
+}
+
+function getPuzzleByKey(key) {
+  if (!key) return null;
+  return PUZZLE_DEFS.find(p => p.key === key) || null;
+}
+
+function getTodayChallengeId() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function buildDailyChallengePayload(challengeId) {
+  const rng = mulberry32(hashString(`daily:${challengeId}`));
+  const size = 4 + (Math.floor(rng() * 10) % 5); // 4..8
+  const board = Array.from({ length: size }, () => Array(size).fill(0));
+  const used = new Set();
+  function pickCell() {
+    for (let i = 0; i < size * size * 2; i++) {
+      const r = Math.floor(rng() * size);
+      const c = Math.floor(rng() * size);
+      const k = `${r}:${c}`;
+      if (!used.has(k)) {
+        used.add(k);
+        return [r, c];
+      }
+    }
+    return [0, 0];
+  }
+  // Guarantee an opening merge opportunity.
+  board[0][0] = 2;
+  board[0][1] = 2;
+  used.add('0:0');
+  used.add('0:1');
+
+  const extraTiles = Math.max(1, Math.floor(size / 2));
+  const pool = [2, 2, 2, 4, 4, 8, 16];
+  for (let i = 0; i < extraTiles; i++) {
+    const [r, c] = pickCell();
+    board[r][c] = pool[Math.floor(rng() * pool.length)];
+  }
+  return {
+    board,
+    score: 0,
+    mode: 'daily',
+    modeLabel: `Daily Challenge (${challengeId})`,
+    dailyId: challengeId,
+    rngSeed: `daily-seed:${challengeId}`,
+    untracked: false,
+  };
+}
+
+function loadBoardPayload(payload) {
+  if (!payload || !Array.isArray(payload.board)) return;
+  if (payload.hardcore != null) {
+    setHardcoreEnabled(!!payload.hardcore);
+  }
+  localStorage.setItem('demo_board', JSON.stringify(payload));
+  localStorage.setItem('skipRestore', '1');
+  newGame();
+}
+
+function captureReplayFrame() {
+  if (isReplaying || !grid) return;
+  const frame = { board: serializeGrid(), score };
+  const sig = JSON.stringify(frame);
+  if (sig === lastReplaySignature) return;
+  replayFrames.push(frame);
+  lastReplaySignature = sig;
+}
+
+function resetReplayCapture() {
+  replayFrames = [];
+  lastReplaySignature = '';
+  captureReplayFrame();
+}
+
+function syncReplayShareButtons() {
+  const hasReplay = !!(lastFinishedGame?.replayFrames?.length);
+  if (replayBtnEl) replayBtnEl.disabled = !hasReplay;
+  if (shareBtnEl) shareBtnEl.disabled = !hasReplay;
+}
+
+function restoreLastFinishedGame() {
+  try {
+    const raw = localStorage.getItem(LAST_FINISHED_GAME_KEY);
+    lastFinishedGame = raw ? JSON.parse(raw) : null;
+  } catch {
+    lastFinishedGame = null;
+  }
+  syncReplayShareButtons();
+}
+
+function showToastMessage(message, type = 'success') {
+  if (!message) return;
+  const container = document.getElementById('auth-toast-container');
+  if (!container) {
+    refreshModeStatus(message, true);
+    return;
+  }
+  const toast = document.createElement('div');
+  toast.className = `auth-toast auth-toast--${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('auth-toast--visible'));
+  setTimeout(() => {
+    toast.classList.remove('auth-toast--visible');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  }, 2600);
+}
+
+function buildPuzzlePayload(puzzle) {
+  if (!puzzle) return null;
+  return {
+    board: puzzle.board,
+    score: puzzle.score || 0,
+    mode: 'puzzle',
+    modeLabel: puzzle.modeLabel || `Puzzle: ${puzzle.label}`,
+    puzzleKey: puzzle.key,
+    untracked: false,
+  };
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatDateHuman(isoDate) {
+  const [y, m, d] = String(isoDate || '').split('-').map(Number);
+  if (!y || !m || !d) return String(isoDate || '');
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function getDailyChallengeSummary(payload) {
+  if (!payload || !Array.isArray(payload.board)) return null;
+  const size = clampBoardSize(payload.board.length || DEFAULT_BOARD_SIZE);
+  let nonZero = 0;
+  let highest = 0;
+  for (const row of payload.board) {
+    if (!Array.isArray(row)) continue;
+    for (const v of row) {
+      const n = Number(v) || 0;
+      if (!n) continue;
+      nonZero++;
+      if (n > highest) highest = n;
+    }
+  }
+  return { size, nonZero, highest: highest || 2 };
+}
+
+function renderDailyChallengeRows(rows) {
+  if (!dailyChallengeLbBodyEl) return;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    dailyChallengeLbBodyEl.innerHTML = '<tr><td colspan="4" class="lb-empty">No scores posted yet today.</td></tr>';
+    return;
+  }
+  const currentUser = typeof window.getCurrentUser === 'function' ? window.getCurrentUser() : null;
+  const currentName = String(currentUser?.user_metadata?.display_name || '').toLowerCase();
+  dailyChallengeLbBodyEl.innerHTML = rows.map((row, idx) => {
+    const rank = idx + 1;
+    const rankClass = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : '';
+    const name = String(row?.display_name || 'Anonymous');
+    const isMe = !!currentName && name.toLowerCase() === currentName;
+    return `
+      <tr class="${isMe ? 'leaderboard-current-user' : ''}">
+        <td class="lb-rank ${rankClass}">${rank}</td>
+        <td class="lb-name">${escHtml(name)}${isMe ? ' <span class="lb-you">(you)</span>' : ''}</td>
+        <td class="lb-main">${Number(row?.best_score || 0).toLocaleString()}</td>
+        <td class="lb-sec">${Number(row?.best_tile || 0).toLocaleString()}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadDailyChallengeLeaderboard(challengeId) {
+  if (!dailyChallengeLbStatusEl || !dailyChallengeLbBodyEl) return;
+  dailyChallengeLbBodyEl.innerHTML = '';
+  dailyChallengeLbStatusEl.textContent = 'Loading today’s results…';
+  const requestId = ++dailyChallengeModalRequestId;
+  try {
+    const { data, error } = await window.db.getDailyChallengeLeaderboard(challengeId);
+    if (requestId !== dailyChallengeModalRequestId || !dailyChallengeModalOpen) return;
+    if (error) throw error;
+    renderDailyChallengeRows(data || []);
+    dailyChallengeLbStatusEl.textContent = (data && data.length)
+      ? `Top ${data.length} run${data.length === 1 ? '' : 's'} today`
+      : 'No scores posted yet — you could be first.';
+  } catch {
+    if (requestId !== dailyChallengeModalRequestId || !dailyChallengeModalOpen) return;
+    renderDailyChallengeRows([]);
+    dailyChallengeLbStatusEl.textContent = 'Could not load today’s leaderboard right now.';
+  }
+}
+
+function closeDailyChallengeModal() {
+  if (!dailyChallengeModalEl) return;
+  dailyChallengeModalOpen = false;
+  dailyChallengeModalRequestId++;
+  pendingDailyPayload = null;
+  dailyChallengeModalEl.hidden = true;
+}
+
+function runDailyChallenge() {
+  const challengeId = getTodayChallengeId();
+  const payload = pendingDailyPayload && pendingDailyPayload.dailyId === challengeId
+    ? pendingDailyPayload
+    : buildDailyChallengePayload(challengeId);
+  pendingDailyPayload = null;
+  loadBoardPayload(payload);
+}
+
+function confirmDailyChallengeStart() {
+  if (dailyChallengeModalOpen) closeDailyChallengeModal();
+  runDailyChallenge();
+}
+
+function openDailyChallengeModal() {
+  if (!dailyChallengeModalEl) {
+    runDailyChallenge();
+    return;
+  }
+  const challengeId = getTodayChallengeId();
+  const payload = buildDailyChallengePayload(challengeId);
+  pendingDailyPayload = payload;
+  dailyChallengeModalOpen = true;
+
+  const summary = getDailyChallengeSummary(payload);
+  if (dailyChallengeDescriptionEl) {
+    dailyChallengeDescriptionEl.textContent =
+      `${formatDateHuman(challengeId)} challenge: everyone gets the same seeded ${summary?.size || 4}×${summary?.size || 4} opening board.`;
+  }
+  if (dailyChallengeRulesEl) {
+    const spawnCount = getSpawnCountForBoardSize(summary?.size || DEFAULT_BOARD_SIZE);
+    const scoreMult = getScoreMultiplierForBoardSize(summary?.size || DEFAULT_BOARD_SIZE);
+    const highest = Number(summary?.highest || 2).toLocaleString();
+    const scoreRule = scoreMult < 1 ? 'Merge scoring is reduced to 50%.' : 'Merge scoring is standard.';
+    dailyChallengeRulesEl.textContent =
+      `Start with ${summary?.nonZero || 2} tiles (highest ${highest}). ${spawnCount} tile${spawnCount === 1 ? '' : 's'} spawn per move. ${scoreRule}`;
+  }
+  dailyChallengeModalEl.hidden = false;
+  loadDailyChallengeLeaderboard(challengeId);
+  window.refreshIcons?.();
+}
+
+function runSelectedPuzzle() {
+  const key = puzzleSelectEl?.value;
+  if (!key) return;
+  const puzzle = getPuzzleByKey(key);
+  if (!puzzle) return;
+  loadBoardPayload(buildPuzzlePayload(puzzle));
+}
+
+function toggleHardcoreMode() {
+  setHardcoreEnabled(!isHardcore);
+  showToastMessage(isHardcore ? 'Hardcore mode enabled.' : 'Hardcore mode disabled.');
+}
+
+function getHintDirection() {
+  const board = serializeGrid();
+  return window.getBestMove?.(board) || null;
+}
+
+function hideHintArrow() {
+  if (!hintArrowOverlayEl || !hintArrowEl) return;
+  if (hintArrowHideTimer) {
+    clearTimeout(hintArrowHideTimer);
+    hintArrowHideTimer = null;
+  }
+  if (hintArrowAnimation) {
+    hintArrowAnimation.cancel();
+    hintArrowAnimation = null;
+  }
+  hintArrowOverlayEl.classList.remove('hint-arrow-overlay--visible');
+  hintArrowEl.style.opacity = '0';
+  hintArrowEl.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+}
+
+function showHintDirectionArrow(dir) {
+  if (!hintArrowOverlayEl || !hintArrowEl) return;
+  const cfg = {
+    left:  { start: ['112%', '50%'], end: ['-12%', '50%'], rotate: 180, className: 'hint-arrow-overlay--left' },
+    right: { start: ['-12%', '50%'], end: ['112%', '50%'], rotate: 0, className: 'hint-arrow-overlay--right' },
+    up:    { start: ['50%', '112%'], end: ['50%', '-12%'], rotate: -90, className: 'hint-arrow-overlay--up' },
+    down:  { start: ['50%', '-12%'], end: ['50%', '112%'], rotate: 90, className: 'hint-arrow-overlay--down' },
+  }[dir];
+  if (!cfg) return;
+
+  if (hintArrowAnimation) {
+    hintArrowAnimation.cancel();
+    hintArrowAnimation = null;
+  }
+  if (hintArrowHideTimer) {
+    clearTimeout(hintArrowHideTimer);
+    hintArrowHideTimer = null;
+  }
+
+  hintArrowOverlayEl.classList.remove(
+    'hint-arrow-overlay--left',
+    'hint-arrow-overlay--right',
+    'hint-arrow-overlay--up',
+    'hint-arrow-overlay--down'
+  );
+  hintArrowOverlayEl.classList.add('hint-arrow-overlay--visible', cfg.className);
+  hintArrowEl.style.left = cfg.start[0];
+  hintArrowEl.style.top = cfg.start[1];
+  hintArrowEl.style.opacity = '1';
+  hintArrowEl.style.transform = `translate(-50%, -50%) rotate(${cfg.rotate}deg)`;
+
+  hintArrowAnimation = hintArrowEl.animate([
+    { left: cfg.start[0], top: cfg.start[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 0.2, offset: 0 },
+    { left: cfg.start[0], top: cfg.start[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 1, offset: 0.1 },
+    { left: cfg.end[0], top: cfg.end[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 1, offset: 0.84 },
+    { left: cfg.end[0], top: cfg.end[1], transform: `translate(-50%, -50%) rotate(${cfg.rotate}deg)`, opacity: 0, offset: 1 },
+  ], {
+    duration: 1200,
+    easing: 'cubic-bezier(0.25, 0.85, 0.3, 1)',
+    fill: 'forwards',
+  });
+  hintArrowAnimation.onfinish = () => {
+    hintArrowAnimation = null;
+    hideHintArrow();
+  };
+  hintArrowHideTimer = setTimeout(hideHintArrow, 1350);
+}
+
+function showHint() {
+  if (isReplaying || isAnimating || isGameOver || (won && !keepGoing)) return;
+  const dir = getHintDirection();
+  if (!dir) {
+    showToastMessage('No hint available — board is stuck.', 'error');
+    return;
+  }
+  const map = { left: '← Left', right: '→ Right', up: '↑ Up', down: '↓ Down' };
+  refreshModeStatus(`Hint: ${map[dir] || dir}`, true);
+  showHintDirectionArrow(dir);
+  setTimeout(() => refreshModeStatus(undefined, false), 1400);
+}
+
+function clearReplayTimer() {
+  if (replayTimer) {
+    clearTimeout(replayTimer);
+    replayTimer = null;
+  }
+}
+
+function renderBoardFromValues(board, scoreValue = 0) {
+  if (!Array.isArray(board) || !board.length) return;
+  const n = clampBoardSize(board.length);
+  setBoardSize(n);
+  tilesContainer.innerHTML = '';
+  grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const v = board[r]?.[c];
+      if (v) grid[r][c] = new Tile(r, c, v, false);
+    }
+  }
+  score = scoreValue || 0;
+  scoreEl.textContent = score;
+  updateScoreDisplay(0);
+  scheduleTileLayoutFix();
+}
+
+function startReplay() {
+  const frames = lastFinishedGame?.replayFrames;
+  if (!Array.isArray(frames) || frames.length === 0) return;
+  if (isReplaying) return;
+  stopAutoplay();
+  setActiveMode(null);
+  hideOverlays();
+  isReplaying = true;
+  clearReplayTimer();
+  refreshModeStatus('Replay running…', true);
+
+  let idx = 0;
+  const step = () => {
+    if (!isReplaying) return;
+    const frame = frames[idx];
+    if (!frame) {
+      isReplaying = false;
+      refreshModeStatus(`Replay finished • ${currentModeLabel}`, true);
+      setTimeout(() => refreshModeStatus(undefined, false), 1200);
+      return;
+    }
+    renderBoardFromValues(frame.board, frame.score);
+    idx++;
+    replayTimer = setTimeout(step, 280);
+  };
+  step();
+}
+
+function buildShareText() {
+  if (!lastFinishedGame) return '';
+  const g = lastFinishedGame;
+  const result = g.won ? 'Win' : 'Loss';
+  return [
+    `2048 ${result} • ${g.modeLabel || 'Classic'} • ${g.boardSize}x${g.boardSize}`,
+    `Score ${Number(g.score || 0).toLocaleString()} • Best Tile ${Number(g.highestTile || 0).toLocaleString()} • Moves ${Number(g.moves || 0).toLocaleString()}`,
+    'Play: https://2048.lachiethurlow.com'
+  ].join('\n');
+}
+
+async function shareLastGame() {
+  if (!lastFinishedGame) return;
+  const text = buildShareText();
+  try {
+    if (navigator.share) {
+      await navigator.share({ text });
+      showToastMessage('Shared!');
+      return;
+    }
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToastMessage('Share text copied to clipboard.');
+      return;
+    }
+    throw new Error('Clipboard API unavailable');
+  } catch {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.setAttribute('readonly', 'readonly');
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      textArea.remove();
+      showToastMessage('Share text copied to clipboard.');
+      return;
+    } catch {
+      showToastMessage('Could not share right now.', 'error');
+    }
+  }
+}
+
+function saveFinishedGameForReplay(detail) {
+  if (!detail || !Array.isArray(replayFrames) || replayFrames.length < 1) return;
+  const payload = {
+    score: detail.score || 0,
+    highestTile: detail.highestTile || 0,
+    moves: detail.moves || 0,
+    won: !!detail.won,
+    boardSize: detail.boardSize || SIZE,
+    mode: detail.mode || buildModeCode(),
+    modeLabel: currentModeLabel,
+    replayFrames: replayFrames.slice(0, 500),
+    createdAt: Date.now(),
+  };
+  lastFinishedGame = payload;
+  try {
+    localStorage.setItem(LAST_FINISHED_GAME_KEY, JSON.stringify(payload));
+  } catch {}
+  syncReplayShareButtons();
+}
+
+function initFeatureControls() {
+  initPuzzleControls();
+  restoreLastFinishedGame();
+  setHardcoreEnabled(localStorage.getItem(HARDCORE_MODE_KEY) === '1', false);
+
+  dailyChallengeBtnEl?.addEventListener('click', openDailyChallengeModal);
+  startPuzzleBtnEl?.addEventListener('click', runSelectedPuzzle);
+  hardcoreToggleBtnEl?.addEventListener('click', toggleHardcoreMode);
+  hintBtnEl?.addEventListener('click', showHint);
+  replayBtnEl?.addEventListener('click', startReplay);
+  shareBtnEl?.addEventListener('click', shareLastGame);
+  dailyChallengeGoBtnEl?.addEventListener('click', confirmDailyChallengeStart);
+  dailyChallengeCancelBtnEl?.addEventListener('click', closeDailyChallengeModal);
+  dailyChallengeCloseBtnEl?.addEventListener('click', closeDailyChallengeModal);
+  dailyChallengeModalEl?.addEventListener('click', (e) => {
+    if (e.target === dailyChallengeModalEl) closeDailyChallengeModal();
+  });
 }
 
 /** Apply N×N grid tracks (repeat(var(), 1fr) is unreliable; minmax avoids flex blowout). */
@@ -333,9 +989,12 @@ function init() {
   bestEl.textContent = best;
   setBoardSize(readPreferredBoardSize());
   initBoardSizePicker();
+  setRuntimeMode({ mode: 'classic', modeLabel: 'Classic' });
+  initFeatureControls();
   newGame();
   syncBoardSizePicker();
   setupFooterCrossPromo();
+  refreshModeStatus();
 }
 
 function buildCells() {
@@ -352,6 +1011,9 @@ function buildCells() {
 let suppressReset = false;
 
 function newGame() {
+  clearReplayTimer();
+  isReplaying = false;
+  isModeStatusSticky = false;
   if (!suppressReset) window.onGameReset?.();
   suppressReset = false;
   stopAutoplay();
@@ -372,6 +1034,18 @@ function newGame() {
       }
     } catch {}
     localStorage.removeItem('demo_board');
+  }
+
+  if (demoPayload) {
+    setRuntimeMode({
+      mode: demoPayload.mode || 'classic',
+      modeLabel: demoPayload.modeLabel || 'Classic',
+      puzzleKey: demoPayload.puzzleKey || null,
+      dailyId: demoPayload.dailyId || null,
+      rngSeed: demoPayload.rngSeed || null,
+    });
+  } else {
+    setRuntimeMode({ mode: 'classic', modeLabel: 'Classic' });
   }
 
   tilesContainer.innerHTML = '';
@@ -405,9 +1079,11 @@ function newGame() {
           if (b[r][c]) grid[r][c] = new Tile(r, c, b[r][c], false);
       if (demoPayload.score) { score = demoPayload.score; scoreEl.textContent = score; updateScoreDisplay(0); }
       if (demoPayload.won) { won = true; }
-      isUntrackedGame = true;
+      // Preserve legacy demo-board behavior (untracked by default) unless explicitly overridden.
+      isUntrackedGame = demoPayload.untracked == null ? true : !!demoPayload.untracked;
       syncBoardSizePicker();
       scheduleTileLayoutFix();
+      resetReplayCapture();
       return;
     }
   }
@@ -415,6 +1091,7 @@ function newGame() {
   spawnTile();
   spawnTile();
   scheduleTileLayoutFix();
+  resetReplayCapture();
 }
 
 // ─── Spawn ───────────────────────────────────────────────────────
@@ -426,8 +1103,8 @@ function spawnTile() {
     }
   }
   if (!empty.length) return null;
-  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
-  const value = Math.random() < SPAWN_2_PROB ? 2 : 4;
+  const [r, c] = empty[Math.floor(randomValue() * empty.length)];
+  const value = randomValue() < SPAWN_2_PROB ? 2 : 4;
   const tile = new Tile(r, c, value, true);
   grid[r][c] = tile;
   return tile;
@@ -437,6 +1114,7 @@ function spawnTile() {
 function move(dir) {
   closeBoardSizeMenu();
   if (boardSizeModal && !boardSizeModal.hidden) return;
+  if (isReplaying) return;
   if (isAnimating || activeMode) return;
   if (isGameOver) return;
   if (won && !keepGoing) return;
@@ -572,6 +1250,7 @@ function afterSlide() {
       // Hand off to win-animation.js; keep isAnimating = true to block input
       spawnTurnTiles();
       updatePowerUpUI();
+      captureReplayFrame();
       document.dispatchEvent(new CustomEvent('game:merge2048', { detail: { tileEl: tile2048.el } }));
       return; // afterSlide returns early; win-animation calls finishWin2048 when done
     }
@@ -588,6 +1267,7 @@ function afterSlide() {
 
   isAnimating = false;
   updatePowerUpUI();
+  captureReplayFrame();
 }
 
 // ─── Direction helpers ───────────────────────────────────────────
@@ -641,6 +1321,11 @@ function serializeGrid() {
 
 // ─── Undo ────────────────────────────────────────────────────────
 function undoMove() {
+  if (isHardcore) {
+    showToastMessage('Undo is disabled in Hardcore mode.', 'error');
+    return;
+  }
+  if (isReplaying) return;
   if (!prevSnapshot || isAnimating) return;
 
   undoUsed = true;
@@ -818,11 +1503,16 @@ function updateBarFills(fills, uses) {
 function updatePowerUpUI() {
   // Undo
   const hasUndo = !!prevSnapshot;
-  undoBtnEl.classList.toggle('unavailable', !hasUndo);
-  undoSubEl.textContent = hasUndo ? 'Last move' : 'No moves yet';
+  const canUndo = hasUndo && !isHardcore;
+  undoBtnEl.classList.toggle('unavailable', !canUndo);
+  undoSubEl.textContent = isHardcore ? 'Disabled in Hardcore' : (hasUndo ? 'Last move' : 'No moves yet');
 
   // Swap
-  if (swapUses > 0) {
+  if (isHardcore) {
+    swapBtnEl.classList.add('locked');
+    swapBtnEl.classList.remove('active');
+    if (activeMode !== 'swap') swapSubEl.textContent = 'Disabled in Hardcore';
+  } else if (swapUses > 0) {
     swapBtnEl.classList.remove('locked');
     if (activeMode !== 'swap') swapSubEl.textContent = '';
   } else {
@@ -833,7 +1523,11 @@ function updatePowerUpUI() {
   updateBarFills(swapFills, swapUses);
 
   // Delete
-  if (deleteUses > 0) {
+  if (isHardcore) {
+    deleteBtnEl.classList.add('locked');
+    deleteBtnEl.classList.remove('active');
+    if (activeMode !== 'delete') deleteSubEl.textContent = 'Disabled in Hardcore';
+  } else if (deleteUses > 0) {
     deleteBtnEl.classList.remove('locked');
     if (activeMode !== 'delete') deleteSubEl.textContent = '';
   } else {
@@ -847,7 +1541,7 @@ function updatePowerUpUI() {
 // ─── Score ───────────────────────────────────────────────────────
 function updateScoreDisplay(addedScore) {
   scoreEl.textContent = score;
-  if (score > best && !isUntrackedGame && !isAutoplay) {
+  if (score > best && !isUntrackedGame && !isAutoplay && !isReplaying) {
     best = score;
     bestEl.textContent = best;
     localStorage.setItem('best2048', best);
@@ -872,18 +1566,29 @@ function dispatchGameEnd(isWon) {
   const durationSeconds = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
   const highestTile = getHighestTile();
   const boardState = serializeGrid();
+  const modeCode = buildModeCode();
+  const detail = {
+    score,
+    highestTile,
+    moves: moveCount,
+    durationSeconds,
+    won: isWon,
+    boardState,
+    undoUsed,
+    powerupUsed,
+    mode: modeCode,
+    modeLabel: currentModeLabel,
+    boardSize: SIZE,
+  };
 
-  document.dispatchEvent(new CustomEvent('game:end', { detail: {
-    score, highestTile, moves: moveCount,
-    durationSeconds, won: isWon, boardState,
-    undoUsed, powerupUsed, mode: 'classic', boardSize: SIZE,
-  }}));
+  document.dispatchEvent(new CustomEvent('game:end', { detail }));
+  saveFinishedGameForReplay(detail);
 
   // Persist to localStorage for guest sync later
   try {
     const games = JSON.parse(localStorage.getItem('games2048') || '[]');
     games.push({
-      score, highestTile, moves: moveCount, durationSeconds, won: isWon, mode: 'classic',
+      score, highestTile, moves: moveCount, durationSeconds, won: isWon, mode: modeCode, modeLabel: currentModeLabel,
       boardSize: SIZE, boardState, createdAt: Date.now(),
     });
     if (games.length > 10) games.splice(0, games.length - 10);
@@ -944,6 +1649,11 @@ window.addEventListener('keydown', (e) => {
       syncBoardSizePicker();
       return;
     }
+    if (dailyChallengeModalEl && !dailyChallengeModalEl.hidden) {
+      e.preventDefault();
+      closeDailyChallengeModal();
+      return;
+    }
     if (activeMode) { e.preventDefault(); setActiveMode(null); }
     return;
   }
@@ -951,10 +1661,15 @@ window.addEventListener('keydown', (e) => {
   // Undo: Ctrl+Z / Cmd+Z
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
+    if (isHardcore) {
+      showToastMessage('Undo is disabled in Hardcore mode.', 'error');
+      return;
+    }
     undoMove();
     return;
   }
 
+  if (isReplaying) return;
   if (isAutoplay) return; // AI has control
 
   // Don't intercept keys when the user is typing in a form field
@@ -982,7 +1697,7 @@ boardEl.addEventListener('pointerdown', (e) => {
   closeBoardSizeMenu();
   if (boardSizeModal && !boardSizeModal.hidden) return;
   // Don't initiate swipe if a power-up mode is active or AI is running
-  if (activeMode || isAutoplay) return;
+  if (activeMode || isAutoplay || isReplaying) return;
   pStartX = e.clientX;
   pStartY = e.clientY;
   pStarted = true;
@@ -1005,15 +1720,29 @@ boardEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fals
 newGameBtn.addEventListener('click', newGame);
 aiBtnEl.addEventListener('click', toggleAutoplay);
 
-undoBtnEl.addEventListener('click', undoMove);
+undoBtnEl.addEventListener('click', () => {
+  if (isHardcore) {
+    showToastMessage('Undo is disabled in Hardcore mode.', 'error');
+    return;
+  }
+  undoMove();
+});
 
 swapBtnEl.addEventListener('click', () => {
+  if (isHardcore) {
+    showToastMessage('Swap is disabled in Hardcore mode.', 'error');
+    return;
+  }
   if (swapUses <= 0) return;
   if (won && !keepGoing) return;
   setActiveMode(activeMode === 'swap' ? null : 'swap');
 });
 
 deleteBtnEl.addEventListener('click', () => {
+  if (isHardcore) {
+    showToastMessage('Delete is disabled in Hardcore mode.', 'error');
+    return;
+  }
   if (deleteUses <= 0) return;
   if (won && !keepGoing) return;
   setActiveMode(activeMode === 'delete' ? null : 'delete');
@@ -1036,6 +1765,7 @@ function toggleAutoplay() {
 }
 
 function startAutoplay() {
+  if (isReplaying) return;
   if (isGameOver) return;
   if (won && !keepGoing) return;
   isAutoplay = true;
@@ -1095,6 +1825,9 @@ window.getGameState = function () {
   return {
     board, boardSize: SIZE, score, moveCount, won, keepGoing,
     swapUses, deleteUses, undoUsed, powerupUsed,
+    mode: currentMode, modeLabel: currentModeLabel,
+    puzzleKey: currentPuzzleKey, dailyId: currentDailyId,
+    hardcore: isHardcore,
     durationSoFar: gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0,
   };
 };
@@ -1137,11 +1870,32 @@ window.applyGameState = function (state) {
   deleteUses   = state.delete_uses  ?? state.deleteUses  ?? 0;
   undoUsed     = state.undo_used    || state.undoUsed    || false;
   powerupUsed  = state.powerup_used || state.powerupUsed || false;
+  if (state.mode || state.modeLabel || state.puzzleKey || state.dailyId) {
+    const parsed = parseModeCode(state.mode || 'classic');
+    const puzzleKey = state.puzzleKey || parsed.puzzleKey || null;
+    const dailyId = state.dailyId || parsed.dailyId || null;
+    const puzzle = getPuzzleByKey(puzzleKey);
+    const defaultModeLabel = parsed.mode === 'daily' && dailyId
+      ? `Daily Challenge (${dailyId})`
+      : parsed.mode === 'puzzle' && puzzle
+        ? (puzzle.modeLabel || `Puzzle: ${puzzle.label}`)
+        : 'Classic';
+    setRuntimeMode({
+      mode: parsed.mode,
+      modeLabel: state.modeLabel || defaultModeLabel,
+      puzzleKey,
+      dailyId,
+      rngSeed: dailyId ? `daily-seed:${dailyId}` : null,
+    });
+  }
+  if (state.hardcore != null) setHardcoreEnabled(!!state.hardcore, false);
   const dur    = state.duration_so_far ?? state.durationSoFar ?? 0;
   if (dur > 0) gameStartTime = Date.now() - dur * 1000;
   scoreEl.textContent = score;
   updateScoreDisplay(0);
   updatePowerUpUI();
+  resetReplayCapture();
+  refreshModeStatus();
   persistPreferredBoardSize(SIZE);
   syncBoardSizePicker();
   scheduleTileLayoutFix();
